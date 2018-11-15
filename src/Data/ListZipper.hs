@@ -51,7 +51,9 @@ module Data.ListZipper(
 import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty))
 import Control.Category((.), id)
 import Control.Comonad(Comonad(duplicate, extract))
-import Control.Lens hiding ((<.>))
+import Control.Lens(Each(each), Reversing(reversing), Ixed(ix), Rewrapped, Wrapped(Unwrapped, _Wrapped'), IxValue, Index, Prism', Lens', Traversal', _Wrapped, (^.), iso, (&))
+import Data.Traversable
+import Data.Semigroup.Traversable
 import Control.Monad(Monad((>>=), return), MonadPlus(mplus, mzero), (=<<))
 import Data.Bool(Bool)
 import Data.Eq(Eq((==)))
