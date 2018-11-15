@@ -41,6 +41,11 @@ module Data.ListZipper(
 , moveRightUntil
 , moveLeftRightUntil
 , moveRightLeftUntil
+, opWith
+, moveLeftWith
+, moveRightWith
+, moveLeftRightWith
+, moveRightLeftWith
 , opWhileJust
 , deleteStepLeft
 , deleteStepRight
@@ -447,9 +452,9 @@ idListZipperOp =
   ListZipperOp Just
 
 (&^.) ::
-  ListZipperOp' a
-  -> ListZipper a
-  -> Maybe (ListZipper a)
+  ListZipperOp x y
+  -> ListZipper x
+  -> Maybe y
 (&^.) o z =
   z & o ^. _Wrapped
 
@@ -516,6 +521,46 @@ moveRightLeftUntil ::
   -> ListZipperOp' a
 moveRightLeftUntil p =
   moveRightUntil p <!> moveLeftUntil p
+
+opWith ::
+  ListZipperOp' a
+  -> (a -> Maybe b)
+  -> ListZipperOp a (b, a)
+opWith o p =
+  ListZipperOp (\z ->
+    let go z' =
+          let x = z' ^. focus
+          in  case p x of
+                Nothing ->
+                  go =<< o &^. z'
+                Just w ->
+                  Just (w, x)
+    in  go z
+  )
+
+moveLeftWith ::
+  (a -> Maybe b)
+  -> ListZipperOp a (b, a)
+moveLeftWith =
+  opWith moveLeft
+
+moveRightWith ::
+  (a -> Maybe b)
+  -> ListZipperOp a (b, a)
+moveRightWith =
+  opWith moveRight
+
+moveLeftRightWith ::
+  (a -> Maybe b)
+  -> ListZipperOp a (b, a)
+moveLeftRightWith p =
+  moveLeftWith p <!> moveRightWith p
+
+moveRightLeftWith ::
+  (a -> Maybe b)
+  -> ListZipperOp a (b, a)
+moveRightLeftWith p =
+  moveRightWith p <!> moveLeftWith p
 
 opWhileJust ::
   ListZipperOp' a
