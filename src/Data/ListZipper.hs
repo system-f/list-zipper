@@ -1,0 +1,523 @@
+{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE TypeFamilies #-}
+
+module Data.ListZipper(
+  ListZipper(..)
+, ListZipperOp(..)
+, pureListZipperOp
+, unpureListZipperOp
+, constListZipperOp
+, idListZipperOp
+, (<||>)
+, (&^.)
+, moveLeft
+, moveRight
+, opUntil
+, moveLeftUntil
+, moveRightUntil
+, moveLeftRightUntil
+, moveRightLeftUntil
+, opWhileJust
+, moveStart
+, moveEnd
+, atStart
+, atEnd
+, moveLeftLoop
+, moveRightLoop
+, deleteStepLeft
+, deleteStepRight
+, insertMoveLeft
+, insertMoveRight
+, AsListZipper(..)
+, HasListZipper(..)
+, lefts'
+, rights'
+, leftsrights
+, rightslefts
+, zipper
+, zipper0L
+, zipper0L'
+, zipper0R
+, zipper0R'
+, list
+, zipperIndices
+) where
+
+import Control.Applicative(Applicative(pure, (<*>)))
+import Control.Category((.), id)
+import Control.Comonad(Comonad(duplicate, extract))
+import Control.Lens hiding ((<.>))
+import Control.Monad((>=>), (=<<))
+import Data.Bool(Bool)
+import Data.Eq(Eq((==)))
+import Data.Eq.Deriving(deriveEq1)
+import Data.Foldable(Foldable(toList, foldMap))
+import Data.Functor(Functor(fmap), (<$>))
+import Data.Functor.Alt((<!>))
+import Data.Functor.Apply(Apply((<.>)))
+import Data.Functor.Extend
+import Data.Int(Int)
+import Data.List(unfoldr, zipWith, repeat, reverse, null, zip)
+import Data.List.NonEmpty(NonEmpty((:|)))
+import Data.Maybe(Maybe(Nothing, Just), fromMaybe)
+import Data.Monoid(Monoid(mappend, mempty))
+import Data.Ord(Ord((<)))
+import Data.Semigroup(Semigroup((<>)))
+import Data.Semigroup.Foldable(Foldable1(foldMap1))
+import Prelude(Show, (+))
+import Text.Show.Deriving(deriveShow1)
+
+data ListZipper a =
+  ListZipper 
+    [a]
+    a
+    [a]
+  deriving (Eq, Ord, Show)
+
+instance Functor ListZipper where
+  fmap f (ListZipper l x r) =
+    ListZipper (fmap f l) (f x) (fmap f r)
+
+instance Apply ListZipper where
+  ListZipper l1 x1 r1 <.> ListZipper l2 x2 r2 =
+    ListZipper (zipWith id l1 l2) (x1 x2) (zipWith id r1 r2)
+
+instance Applicative ListZipper where
+  pure a =
+    ListZipper (repeat a) a (repeat a)
+  (<*>) =
+    (<.>)
+
+instance Foldable ListZipper where
+  foldMap f (ListZipper l x r) =
+    foldMap f l `mappend` f x `mappend` foldMap f r
+
+instance Foldable1 ListZipper where
+  foldMap1 f (ListZipper [] x []) =
+    f x
+  foldMap1 f (ListZipper [] x (rh:rt)) =
+    f x <> foldMap1 f (rh :| rt)
+  foldMap1 f (ListZipper (lh:lt) x []) =
+    foldMap1 f (lh :| lt) <> f x
+  foldMap1 f (ListZipper (lh:lt) x (rh:rt)) =
+    foldMap1 f (lh :| lt) <> f x <> foldMap1 f (rh :| rt)
+
+instance Traversable ListZipper where
+  traverse f (ListZipper l x r) =
+    ListZipper <$> traverse f l <*> f x <*> traverse f r
+
+instance Traversable1 ListZipper where
+  traverse1 f (ListZipper [] x []) =
+    (\x' -> ListZipper [] x' []) <$> f x
+  traverse1 f (ListZipper (lh:lt) x []) =
+    (\l' x' -> ListZipper (toList l') x' []) <$> traverse1 f (lh :| lt) <.> f x
+  traverse1 f (ListZipper [] x (rh:rt)) =
+    (\x' r' -> ListZipper [] x' (toList r')) <$> f x <.> traverse1 f (rh :| rt)
+  traverse1 f (ListZipper (lh:lt) x (rh:rt)) =
+    (\l' x' r' -> ListZipper (toList l') x' (toList r')) <$> traverse1 f (lh :| lt) <.> f x <.> traverse1 f (rh :| rt)
+
+instance Semigroup a => Semigroup (ListZipper a) where
+  ListZipper l1 x1 r1 <> ListZipper l2 x2 r2 =
+    ListZipper (zipWith (<>) l1 l2) (x1 <> x2) (zipWith (<>) r1 r2)
+
+instance Each (ListZipper a) (ListZipper a) a a where
+  each =
+    traverse
+
+instance Reversing (ListZipper a) where
+  reversing (ListZipper l x r) =
+    ListZipper (reverse l) x (reverse r)
+
+type instance IxValue (ListZipper a) = a
+type instance Index (ListZipper a) = Int
+instance Ixed (ListZipper a) where
+  ix i f z =
+    if i < 0
+      then
+        pure z
+      else
+        let ListZipper l x r =
+              zipperIndices z
+            applyn (n, a) =
+              if i == n
+                then
+                  f a
+                else
+                  pure a
+        in  ListZipper <$> traverse applyn l <*> applyn x <*> traverse applyn r
+
+instance Extend ListZipper where
+  duplicated z =
+    let dup x =
+          (x, x)
+        unf m =
+          unfoldr (fmap dup . (m ^. _Wrapped)) z
+    in  ListZipper (unf moveLeft) z (unf moveRight)
+
+instance Comonad ListZipper where
+  duplicate =
+    duplicated
+  extract (ListZipper _ x _) =
+    x
+
+newtype ListZipperOp a =
+  ListZipperOp
+    (ListZipper a -> Maybe (ListZipper a))
+
+instance ListZipperOp x ~ y =>
+  Rewrapped (ListZipperOp w) y
+
+instance Wrapped (ListZipperOp x) where
+  type Unwrapped (ListZipperOp x) =
+    ListZipper x
+    -> Maybe (ListZipper x)
+  _Wrapped' =
+    iso
+      (\(ListZipperOp x) -> x)
+      ListZipperOp
+
+instance Semigroup (ListZipperOp a) where
+  ListZipperOp x <> ListZipperOp y =
+    ListZipperOp (x >=> y)
+
+instance Monoid (ListZipperOp a) where
+  mappend =
+    (<>)
+  mempty =
+    ListZipperOp (pure Nothing)
+
+pureListZipperOp ::
+  (ListZipper a -> ListZipper a)
+  -> ListZipperOp a
+pureListZipperOp k =
+  ListZipperOp (Just . k)
+
+unpureListZipperOp ::
+  ListZipperOp a
+  -> ListZipper a
+  -> ListZipper a
+unpureListZipperOp (ListZipperOp x) =
+  fromMaybe <*> x
+
+constListZipperOp ::
+  ListZipper a
+  -> ListZipperOp a
+constListZipperOp =
+  pureListZipperOp . pure
+
+idListZipperOp ::
+  ListZipperOp a
+idListZipperOp =
+  ListZipperOp Just
+
+(<||>) ::
+  ListZipperOp a
+  -> ListZipperOp a
+  -> ListZipperOp a
+ListZipperOp x <||> ListZipperOp y =
+  ListZipperOp (\z ->
+    x z <!> y z  
+  )
+
+infixl 3 <||>
+
+(&^.) ::
+  ListZipperOp a
+  -> ListZipper a
+  -> Maybe (ListZipper a)
+(&^.) o z =
+  z & o ^. _Wrapped
+
+infixr 5 &^.
+
+moveLeft ::
+  ListZipperOp a
+moveLeft =
+  ListZipperOp (\z ->
+    case z of
+      ListZipper [] _ _ ->
+        Nothing
+      ListZipper (h:t) x r ->
+        Just (ListZipper t h (x:r))
+  )
+
+moveRight ::
+  ListZipperOp a
+moveRight =
+  ListZipperOp (\z ->
+    case z of
+      ListZipper _ _ [] ->
+        Nothing
+      ListZipper l x (h:t) ->
+        Just (ListZipper (x:l) h t)
+  )
+
+opUntil ::
+  ListZipperOp a
+  -> (a -> Bool)
+  -> ListZipperOp a
+opUntil o p =
+  ListZipperOp (\z ->
+    let go z' =
+          let x = z' ^. focus
+          in  if p x
+                then
+                  Just z'
+                else
+                  go =<< o &^. z'
+    in  go z
+  )
+
+moveLeftUntil ::
+  (a -> Bool)
+  -> ListZipperOp a
+moveLeftUntil =
+  opUntil moveLeft
+
+moveRightUntil ::
+  (a -> Bool)
+  -> ListZipperOp a
+moveRightUntil =
+  opUntil moveRight
+
+moveLeftRightUntil ::
+  (a -> Bool)
+  -> ListZipperOp a
+moveLeftRightUntil p =
+  moveLeftUntil p <||> moveRightUntil p
+
+moveRightLeftUntil ::
+  (a -> Bool)
+  -> ListZipperOp a
+moveRightLeftUntil p =
+  moveRightUntil p <||> moveLeftUntil p
+
+opWhileJust ::
+  ListZipperOp a
+  -> ListZipper a
+  -> ListZipper a
+opWhileJust o z =
+  case o &^. z of
+    Nothing ->
+      z
+    Just z' ->
+      opWhileJust o z'
+
+moveStart ::
+  ListZipper a
+  -> ListZipper a
+moveStart =
+  opWhileJust moveLeft
+
+moveEnd ::
+  ListZipper a
+  -> ListZipper a
+moveEnd =
+  opWhileJust moveRight
+
+atStart ::
+  HasListZipper z a =>
+  z
+  -> Bool
+atStart z =
+  null (z ^. lefts)
+
+atEnd ::
+  HasListZipper z a =>
+  z
+  -> Bool
+atEnd z =
+  null (z ^. rights)
+
+moveLeftLoop ::
+  ListZipper a
+  -> ListZipper a
+moveLeftLoop z =
+  fromMaybe (moveEnd z) (moveLeft &^. z)
+
+moveRightLoop ::
+  ListZipper a
+  -> ListZipper a
+moveRightLoop z =
+  fromMaybe (moveStart z) (moveRight &^. z)
+
+deleteStepLeft ::
+  ListZipperOp a
+deleteStepLeft =
+  ListZipperOp (\z ->
+    let l = z ^. lefts
+        r = z ^. rights
+    in  case l of
+          [] ->
+            Nothing
+          h:t ->
+            Just (ListZipper t h r)
+  )
+
+deleteStepRight ::
+  ListZipperOp a
+deleteStepRight =
+  ListZipperOp (\z ->
+    let l = z ^. lefts
+        r = z ^. rights
+    in  case r of
+          [] ->
+            Nothing
+          h:t ->
+            Just (ListZipper l h t)
+  )
+
+insertMoveLeft ::
+  a
+  -> ListZipper a
+  -> ListZipper a
+insertMoveLeft a (ListZipper l x r) =
+  ListZipper (a:l) x r
+
+insertMoveRight ::
+  a
+  -> ListZipper a
+  -> ListZipper a
+insertMoveRight a (ListZipper l x r) =
+  ListZipper l x (a:r)
+
+class AsListZipper z a | z -> a where
+  _ListZipper ::
+    Prism' z (ListZipper a)
+  
+instance AsListZipper (ListZipper a) a where
+  _ListZipper =
+    id
+
+class HasListZipper z a | z -> a where
+  listZipper ::
+    Lens' z (ListZipper a)
+  focus ::
+    Lens' z a
+  {-# INLINE focus #-}
+  lefts ::
+    Lens' z [a]
+  {-# INLINE lefts #-}
+  rights ::
+    Lens' z [a]
+  {-# INLINE rights #-}
+  lefts =
+    listZipper . lefts
+  focus =
+    listZipper . focus
+  rights =
+    listZipper . rights
+
+instance HasListZipper (ListZipper a) a where
+  {-# INLINE focus #-}
+  {-# INLINE lefts #-}
+  {-# INLINE rights #-}
+  listZipper =
+    id
+  lefts f (ListZipper l x r) =
+    fmap (\l' -> ListZipper l' x r) (f l)
+  focus f (ListZipper l x r) =
+    fmap (\x' -> ListZipper l x' r) (f x)
+  rights f (ListZipper l x r) =
+    fmap (\r' -> ListZipper l x r') (f r)
+
+lefts' ::
+  HasListZipper z a =>
+  Traversal' z a
+lefts' =
+  lefts . traverse
+
+rights' ::
+  HasListZipper z a =>
+  Traversal' z a
+rights' =
+  rights . traverse
+
+leftsrights ::
+  Traversal' (ListZipper a) a
+leftsrights f (ListZipper l x r) =
+  (\l' r' -> ListZipper l' x r') <$> traverse f l <*> traverse f r
+
+rightslefts ::
+  Traversal' (ListZipper a) a
+rightslefts f (ListZipper l x r) =
+  (\r' l' -> ListZipper l' x r') <$> traverse f r <*> traverse f l
+
+zipper ::
+  [a]
+  -> Maybe (ListZipper a)
+zipper [] =
+  Nothing
+zipper (h:t) =
+  Just (ListZipper [] h t)
+
+zipper0L ::
+  a
+  -> [a]
+  -> ListZipper a
+zipper0L =
+  ListZipper []
+
+zipper0L' ::
+  NonEmpty a
+  -> ListZipper a
+zipper0L' (h :| t) =
+  zipper0L h t
+
+zipper0R ::
+  [a]
+  -> a
+  -> ListZipper a
+zipper0R l x =
+  ListZipper l x []
+
+zipper0R' ::
+  NonEmpty a
+  -> ListZipper a
+zipper0R' (h :| []) =
+  ListZipper [] h []
+zipper0R' (h :| i : t) =
+  let ListZipper l x r = zipper0R' (i :| t)
+  in  ListZipper (h:l) x r
+
+list ::
+  ListZipper a
+  -> [a]
+list (ListZipper l x r) =
+  reverse l <> (x : r)
+
+zipperIndices ::
+  ListZipper a
+  -> ListZipper (Int, a)
+zipperIndices (ListZipper l x r) =
+  let zipl ::
+        [a]
+        -> [b]
+        -> ([a], [(a, b)])
+      zipl y [] =
+        (y, [])
+      zipl [] (_:_) =
+        ([], [])
+      zipl (a:b) (c:d) =
+        fmap ((a, c) :) (zipl b d)
+      rl =
+        reverse l
+      (z, l') =
+        zipl [0..] rl
+      ln =
+        case z of
+          n:_ ->
+            n
+          [] ->
+            0
+  in  ListZipper
+        (reverse l')
+        (ln, x)
+        (zip [ln + 1..] r)
+
+deriveEq1 ''ListZipper
+deriveShow1 ''ListZipper

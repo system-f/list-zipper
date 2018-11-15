@@ -1,0 +1,28 @@
+*~
+*#*
+
+# CABAL
+/dist
+/dist-newstyle
+/.cabal-sandbox
+/cabal.sandbox.config
+/cabal.project.freeze
+
+# nix
+/result
+
+# Haskell Program Coverage
+/.hpc
+/*.tix
+
+# Leksah
+*.lkshs
+
+# Intellij IDEA
+/.idea
+*.iml
+
+# ctags
+TAGS
+
+.stack-work
