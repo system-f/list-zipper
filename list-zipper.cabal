@@ -32,7 +32,8 @@ library
                     , semigroupoids >= 5.2 && < 6
                     , lens >= 4 && < 5
                     , comonad >= 5.0 && < 6.0
-                    
+                    , profunctors >= 5.0 && < 6.0
+                                        
   ghc-options:
                     -Wall
 

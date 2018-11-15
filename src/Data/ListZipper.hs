@@ -5,7 +5,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module Data.ListZipper(
+module Data.ListZipper {-(
   ListZipper(..)
 , ListZipperOp(..)
 , pureListZipperOp
@@ -34,10 +34,10 @@ module Data.ListZipper(
 , insertMoveRight
 , AsListZipper(..)
 , HasListZipper(..)
-, lefts'
-, rights'
-, leftsrights
-, rightslefts
+, leftz'
+, rightz'
+, leftzrightz
+, rightzleftz
 , zipper
 , zipper0L
 , zipper0L'
@@ -45,20 +45,21 @@ module Data.ListZipper(
 , zipper0R'
 , list
 , zipperIndices
-) where
+) -} where
 
-import Control.Applicative(Applicative(pure, (<*>)))
+import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty))
 import Control.Category((.), id)
 import Control.Comonad(Comonad(duplicate, extract))
 import Control.Lens hiding ((<.>))
-import Control.Monad((>=>), (=<<))
+import Control.Monad(Monad((>>=), return), MonadPlus(mplus, mzero), (>=>), (=<<))
 import Data.Bool(Bool)
 import Data.Eq(Eq((==)))
 import Data.Eq.Deriving(deriveEq1)
 import Data.Foldable(Foldable(toList, foldMap))
 import Data.Functor(Functor(fmap), (<$>))
-import Data.Functor.Alt((<!>))
+import Data.Functor.Alt(Alt((<!>)))
 import Data.Functor.Apply(Apply((<.>)))
+import Data.Functor.Bind
 import Data.Functor.Extend
 import Data.Int(Int)
 import Data.List(unfoldr, zipWith, repeat, reverse, null, zip)
@@ -70,6 +71,98 @@ import Data.Semigroup(Semigroup((<>)))
 import Data.Semigroup.Foldable(Foldable1(foldMap1))
 import Prelude(Show, (+))
 import Text.Show.Deriving(deriveShow1)
+
+import Data.Profunctor
+import Data.Either(Either(Left, Right), either)
+import Data.Traversable
+
+newtype LO x y =
+  LO (ListZipper x -> Maybe y)
+
+instance LO x y ~ t =>
+  Rewrapped (LO x' y') t
+
+instance Wrapped (LO x' y') where
+  type Unwrapped (LO x' y') =
+    ListZipper x'
+    -> Maybe y'
+  _Wrapped' =
+    iso (\(LO k) -> k) LO
+
+class HasLO lo x y | lo -> x y where
+  lo ::
+    Lens' lo (LO x y)
+
+instance HasLO (LO x y) x y where
+  lo =
+    id
+
+class AsLO t x y | t -> x y where
+  _LO :: Prism' t (LO x y)
+
+instance AsLO (LO x y) x y where
+  _LO =
+    id
+    
+undefined = undefined
+
+instance Functor (LO x) where
+  fmap f (LO k) =
+    LO (fmap f . k)
+
+instance Apply (LO x) where
+  LO j <.> LO k =
+    LO (\z -> j z <.> k z)
+
+instance Applicative (LO x) where
+  (<*>) =
+    (<.>)
+  pure =
+    LO . pure . pure
+
+instance Bind (LO x) where
+  LO j >>- f =
+    LO (\z -> j z >>- \a -> let LO k = f a in k z)
+
+instance Alt (LO x) where
+  LO j <!> LO k =
+    LO (\z -> j z <!> k z)
+
+instance Alternative (LO x) where
+  (<|>) =
+    (<!>)
+  empty =
+    LO (pure empty)
+
+instance Monad (LO x) where
+  (>>=) =
+    (>>-)
+  return =
+    pure
+
+instance MonadPlus (LO x) where
+  LO j `mplus` LO k =
+    LO (\z -> j z `mplus` k z)
+  mzero =
+    LO (pure mzero)
+
+instance Semigroup (LO x y) where
+  LO j <> LO k =
+    LO (\z -> j z <!> k z)
+
+instance Monoid (LO x y) where
+  mappend =
+    (<>)
+  mempty =
+    LO (pure Nothing)
+
+instance Profunctor LO where
+  dimap f g (LO k) =
+    LO (fmap g . k . fmap f)
+  rmap =
+    fmap
+
+----
 
 data ListZipper a =
   ListZipper 
@@ -324,14 +417,14 @@ atStart ::
   z
   -> Bool
 atStart z =
-  null (z ^. lefts)
+  null (z ^. leftz)
 
 atEnd ::
   HasListZipper z a =>
   z
   -> Bool
 atEnd z =
-  null (z ^. rights)
+  null (z ^. rightz)
 
 moveLeftLoop ::
   ListZipper a
@@ -349,8 +442,8 @@ deleteStepLeft ::
   ListZipperOp a
 deleteStepLeft =
   ListZipperOp (\z ->
-    let l = z ^. lefts
-        r = z ^. rights
+    let l = z ^. leftz
+        r = z ^. rightz
     in  case l of
           [] ->
             Nothing
@@ -362,8 +455,8 @@ deleteStepRight ::
   ListZipperOp a
 deleteStepRight =
   ListZipperOp (\z ->
-    let l = z ^. lefts
-        r = z ^. rights
+    let l = z ^. leftz
+        r = z ^. rightz
     in  case r of
           [] ->
             Nothing
@@ -399,52 +492,52 @@ class HasListZipper z a | z -> a where
   focus ::
     Lens' z a
   {-# INLINE focus #-}
-  lefts ::
+  leftz ::
     Lens' z [a]
-  {-# INLINE lefts #-}
-  rights ::
+  {-# INLINE leftz #-}
+  rightz ::
     Lens' z [a]
-  {-# INLINE rights #-}
-  lefts =
-    listZipper . lefts
+  {-# INLINE rightz #-}
+  leftz =
+    listZipper . leftz
   focus =
     listZipper . focus
-  rights =
-    listZipper . rights
+  rightz =
+    listZipper . rightz
 
 instance HasListZipper (ListZipper a) a where
   {-# INLINE focus #-}
-  {-# INLINE lefts #-}
-  {-# INLINE rights #-}
+  {-# INLINE leftz #-}
+  {-# INLINE rightz #-}
   listZipper =
     id
-  lefts f (ListZipper l x r) =
+  leftz f (ListZipper l x r) =
     fmap (\l' -> ListZipper l' x r) (f l)
   focus f (ListZipper l x r) =
     fmap (\x' -> ListZipper l x' r) (f x)
-  rights f (ListZipper l x r) =
+  rightz f (ListZipper l x r) =
     fmap (\r' -> ListZipper l x r') (f r)
 
-lefts' ::
+leftz' ::
   HasListZipper z a =>
   Traversal' z a
-lefts' =
-  lefts . traverse
+leftz' =
+  leftz . traverse
 
-rights' ::
+rightz' ::
   HasListZipper z a =>
   Traversal' z a
-rights' =
-  rights . traverse
+rightz' =
+  rightz . traverse
 
-leftsrights ::
+leftzrightz ::
   Traversal' (ListZipper a) a
-leftsrights f (ListZipper l x r) =
+leftzrightz f (ListZipper l x r) =
   (\l' r' -> ListZipper l' x r') <$> traverse f l <*> traverse f r
 
-rightslefts ::
+rightzleftz ::
   Traversal' (ListZipper a) a
-rightslefts f (ListZipper l x r) =
+rightzleftz f (ListZipper l x r) =
   (\r' l' -> ListZipper l' x r') <$> traverse f r <*> traverse f l
 
 zipper ::
