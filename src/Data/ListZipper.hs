@@ -36,8 +36,10 @@ module Data.ListZipper(
 , unpureListZipperOp
 , mkListZipperOp
 , (*>>)
+, (<<*)
 , mkListZipperOp'
 , (.>>)
+, (<<.)
 , moveLeft
 , moveRight
 , opUntil
@@ -67,6 +69,7 @@ import Data.Bool(Bool)
 import Data.Eq(Eq((==)))
 import Data.Eq.Deriving(deriveEq1)
 import Data.Foldable(Foldable(toList, foldMap))
+import Data.Function(flip)
 import Data.Functor(Functor(fmap), (<$>))
 import Data.Functor.Alt(Alt((<!>)))
 import Data.Functor.Apply(Apply((<.>)))
@@ -523,6 +526,15 @@ f *>> k =
 
 infixl 5 *>>
 
+(<<*) :: 
+  ListZipperOp a c
+  -> (ListZipper a -> Maybe b)
+  -> ListZipperOp a b
+(<<*) =
+  flip (*>>)
+
+infixl 5 <<*
+
 mkListZipperOp' ::
   (ListZipper a -> Maybe (ListZipper a))
   -> ListZipperOp' a
@@ -537,6 +549,15 @@ f .>> k =
   mkListZipperOp' f <* k
 
 infixl 5 .>>
+
+(<<.) ::
+  ListZipperOp a b
+  -> (ListZipper a -> Maybe (ListZipper a))
+  -> ListZipperOp' a
+(<<.) =
+  flip (.>>)
+
+infixl 5 <<.
 
 moveLeft ::
   ListZipperOp' a
