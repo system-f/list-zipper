@@ -1,5 +1,6 @@
 0.0.3
 
+* remove profunctor
 * Use state for `ListZipperOp`
 * remove `opWith` and applications
 
