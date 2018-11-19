@@ -35,7 +35,9 @@ module Data.ListZipper(
 , AsListZipperOp(..)
 , unpureListZipperOp
 , mkListZipperOp
+, (*>>)
 , mkListZipperOp'
+, (.>>)
 , moveLeft
 , moveRight
 , opUntil
@@ -512,10 +514,27 @@ mkListZipperOp f =
     (\a -> (z, a)) <$> f z
   )
 
+(*>>) :: 
+  (ListZipper x -> Maybe a)
+  -> ListZipperOp x a
+(*>>) =
+  mkListZipperOp
+
+infixl 5 *>>
+
 mkListZipperOp' ::
-  (ListZipper x -> Maybe (ListZipper x)) -> ListZipperOp' x
+  (ListZipper x -> Maybe (ListZipper x))
+  -> ListZipperOp' x
 mkListZipperOp' f = 
   ListZipperOp (\s -> (\s' -> (s', ())) <$> f s)
+
+(.>>) ::
+  (ListZipper x -> Maybe (ListZipper x))
+  -> ListZipperOp' x
+(.>>) =
+  mkListZipperOp'
+
+infixl 5 .>>
 
 moveLeft ::
   ListZipperOp' a
