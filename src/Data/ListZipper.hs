@@ -32,7 +32,10 @@ module Data.ListZipper(
 , ListZipperOp'
 , HasListZipperOp(..)
 , AsListZipperOp(..)
-, unpureListZipperOp
+, getFocus
+, getRightz
+, getLeftz
+, getList
 , mkListZipperOp
 , (*>>)
 , (<<*)
@@ -54,6 +57,11 @@ module Data.ListZipper(
 , (<$$)
 , moveLeft
 , moveRight
+, opWith
+, moveLeftWith
+, moveRightWith
+, moveLeftRightWith
+, moveRightLeftWith
 , opUntil
 , moveLeftUntil
 , moveRightUntil
@@ -503,16 +511,25 @@ instance MonadError () (ListZipperOp a) where
        k z <!> (z & f () ^. _Wrapped)
      )
 
-unpureListZipperOp ::
-  ListZipperOp a b
-  -> ListZipper a
-  -> ListZipper a
-unpureListZipperOp (ListZipperOp x) z =
-  case x z of
-    Nothing ->
-      z
-    Just (z', _) ->
-      z'
+getFocus ::
+  ListZipperOp a a
+getFocus =
+  ListZipperOp (\z -> Just (z, z ^. focus))
+
+getRightz ::
+  ListZipperOp a [a]
+getRightz =
+  ListZipperOp (\z -> Just (z, z ^. rightz))
+
+getLeftz ::
+  ListZipperOp a [a]
+getLeftz =
+  ListZipperOp (\z -> Just (z, z ^. leftz))
+
+getList ::
+  ListZipperOp a [a]
+getList =
+  ListZipperOp (\z -> Just (z, list z))
 
 mkListZipperOp :: 
   (ListZipper a -> Maybe b)
@@ -697,21 +714,52 @@ moveRight =
         Just (ListZipper (x:l) h t)
   )
 
+opWith ::
+  ListZipperOp a b
+  -> (a -> Maybe c)
+  -> ListZipperOp a c
+opWith o p =
+  ListZipperOp (\z ->
+    let go z' =
+          let x = z' ^. focus
+          in  case p x of
+                Nothing ->
+                  go =<< execListZipperOp o z'
+                Just w ->
+                  Just (z', w)
+    in  go z
+  )
+
+moveLeftWith ::
+  (a -> Maybe c)
+  -> ListZipperOp a c
+moveLeftWith =
+  opWith moveLeft
+
+moveRightWith ::
+  (a -> Maybe c)
+  -> ListZipperOp a c
+moveRightWith =
+  opWith moveRight
+
+moveLeftRightWith ::
+  (a -> Maybe c)
+  -> ListZipperOp a c
+moveLeftRightWith p =
+  moveLeftWith p <!> moveRightWith p
+
+moveRightLeftWith ::
+  (a -> Maybe c)
+  -> ListZipperOp a c
+moveRightLeftWith p =
+  moveRightWith p <!> moveLeftWith p
+
 opUntil ::
   ListZipperOp a x
   -> (a -> Bool)
   -> ListZipperOp' a
 opUntil o p =
-  ListZipperOp (\z ->
-    let go z' =
-          let x = z' ^. focus
-          in  if p x
-                 then
-                   Just (z', ())
-                 else
-                   go =<< execListZipperOp o z'
-    in  go z
-  )
+  opWith o (\a -> if p a then Just () else Nothing)
 
 moveLeftUntil ::
   (a -> Bool)
