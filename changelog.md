@@ -1,3 +1,7 @@
+0.0.4
+
+* lots more functions
+
 0.0.3
 
 * remove profunctor
