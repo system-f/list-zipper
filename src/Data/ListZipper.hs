@@ -32,7 +32,10 @@ module Data.ListZipper(
 , ListZipperOp'
 , HasListZipperOp(..)
 , AsListZipperOp(..)
+, liftListZipperOp
 , getFocus
+, getLeft
+, getRight
 , getRightz
 , getLeftz
 , getList
@@ -521,10 +524,38 @@ instance MonadError () (ListZipperOp a) where
        k z <!> (z & f () ^. _Wrapped)
      )
 
+liftListZipperOp ::
+  Maybe b
+  -> ListZipperOp a b
+liftListZipperOp m =
+  ListZipperOp (\z ->
+    (\b -> (z, b)) <$> m
+  )
+
 getFocus ::
   ListZipperOp a a
 getFocus =
   reader (^. focus)
+
+getLeft ::
+  ListZipperOp a a
+getLeft =
+  do  z <- get
+      case z of
+        ListZipper (l:_) _ _ ->
+          pure l
+        ListZipper [] _ _ ->
+          mempty
+
+getRight ::
+  ListZipperOp a a
+getRight =
+  do  z <- get
+      case z of
+        ListZipper _ _ (r:_) ->
+          pure r
+        ListZipper _ _ [] ->
+          mempty
 
 getRightz ::
   ListZipperOp a [a]
@@ -545,9 +576,7 @@ mkListZipperOp ::
   (ListZipper a -> Maybe b)
   -> ListZipperOp a b
 mkListZipperOp f = 
-  ListZipperOp (\z ->
-    (\a -> (z, a)) <$> f z
-  )
+  get >>= liftListZipperOp . f
 
 (*>>) :: 
   (ListZipper a -> Maybe b)
@@ -677,12 +706,8 @@ execOpList' ::
   ListZipperOp a x
   -> ListZipper a
   -> [a]
-execOpList' o z =
-  case execOpList o z of
-    Nothing ->
-      []
-    Just x ->
-      x
+execOpList' o =
+  fromMaybe [] . execOpList o
 
 ($$>) ::
   ListZipperOp a x
