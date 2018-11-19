@@ -26,14 +26,16 @@ module Data.ListZipper(
 , atEnd
 , moveLeftLoop
 , moveRightLoop
+, insertMoveLeft
+, insertMoveRight
 , ListZipperOp(..)
 , ListZipperOp'
+, unListZipperOp'
 , HasListZipperOp(..)
 , AsListZipperOp(..)
-, pureListZipperOp
 , unpureListZipperOp
-, idListZipperOp
-, (&^.)
+, mkListZipperOp
+, mkListZipperOp'
 , moveLeft
 , moveRight
 , opUntil
@@ -41,24 +43,23 @@ module Data.ListZipper(
 , moveRightUntil
 , moveLeftRightUntil
 , moveRightLeftUntil
-, opWith
-, moveLeftWith
-, moveRightWith
-, moveLeftRightWith
-, moveRightLeftWith
 , opWhileJust
 , deleteStepLeft
 , deleteStepRight
-, insertMoveLeft
-, insertMoveRight
 ) where
 
 import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty))
 import Control.Category((.), id)
 import Control.Comonad(Comonad(duplicate, extract))
-import Control.Lens(Each(each), Reversing(reversing), Ixed(ix), Rewrapped, Wrapped(Unwrapped, _Wrapped'), IxValue, Index, Prism', Lens', Traversal', _Wrapped, (^.), iso, (&))
-import Data.Traversable
-import Data.Semigroup.Traversable
+import Control.Lens(Each(each), Reversing(reversing), Ixed(ix), Rewrapped, Wrapped(Unwrapped, _Wrapped'), IxValue, Index, Prism', Lens', Traversal', _Wrapped, (^.), iso, (&), _1)
+import Control.Monad.Error.Class(MonadError(throwError, catchError))
+import Control.Monad.Fail(MonadFail(fail))
+import Control.Monad.Fix(MonadFix(mfix))
+import Control.Monad.Reader(MonadReader(ask, local, reader))
+import Control.Monad.State(MonadState(get, put, state))
+import qualified Control.Monad.Fail as Fail(fail)
+import Data.Traversable(Traversable(traverse))
+import Data.Semigroup.Traversable(Traversable1(traverse1))
 import Control.Monad(Monad((>>=), return), MonadPlus(mplus, mzero), (=<<))
 import Data.Bool(Bool)
 import Data.Eq(Eq((==)))
@@ -79,7 +80,6 @@ import Data.Semigroup(Semigroup((<>)))
 import Data.Semigroup.Foldable(Foldable1(foldMap1))
 import Prelude(Show, (+))
 import Text.Show.Deriving(deriveShow1)
-import Data.Profunctor(Profunctor(dimap, rmap))
 
 data ListZipper a =
   ListZipper 
@@ -165,7 +165,7 @@ instance Extend ListZipper where
     let dup x =
           (x, x)
         unf m =
-          unfoldr (fmap dup . (m ^. _Wrapped)) z
+          unfoldr (fmap dup . (unListZipperOp' m)) z
     in  ListZipper (unf moveLeft) z (unf moveRight)
 
 instance Comonad ListZipper where
@@ -338,27 +338,50 @@ moveLeftLoop ::
   ListZipper a
   -> ListZipper a
 moveLeftLoop z =
-  fromMaybe (moveEnd z) (moveLeft &^. z)
+  fromMaybe (moveEnd z) (unListZipperOp' moveLeft z)
 
 moveRightLoop ::
   ListZipper a
   -> ListZipper a
 moveRightLoop z =
-  fromMaybe (moveStart z) (moveRight &^. z)
+  fromMaybe (moveStart z) (unListZipperOp' moveRight z)
 
-newtype ListZipperOp x y =
-  ListZipperOp (ListZipper x -> Maybe y)
+insertMoveLeft ::
+  a
+  -> ListZipper a
+  -> ListZipper a
+insertMoveLeft a (ListZipper l x r) =
+  ListZipper (a:l) x r
+
+insertMoveRight ::
+  a
+  -> ListZipper a
+  -> ListZipper a
+insertMoveRight a (ListZipper l x r) =
+  ListZipper l x (a:r)
+
+----
+
+newtype ListZipperOp x a =
+  ListZipperOp (ListZipper x -> Maybe (ListZipper x, a))
 
 type ListZipperOp' x =
-  ListZipperOp x (ListZipper x)
+  ListZipperOp x ()
 
-instance ListZipperOp x y ~ t =>
-  Rewrapped (ListZipperOp x' y') t
+unListZipperOp' ::
+  ListZipperOp' x
+  -> ListZipper x
+  -> Maybe (ListZipper x)
+unListZipperOp' o z =
+  fmap (^. _1) (z & o ^. _Wrapped)
 
-instance Wrapped (ListZipperOp x' y') where
-  type Unwrapped (ListZipperOp x' y') =
+instance ListZipperOp x a ~ t =>
+  Rewrapped (ListZipperOp x' a') t
+
+instance Wrapped (ListZipperOp x' a') where
+  type Unwrapped (ListZipperOp x' a') =
     ListZipper x'
-    -> Maybe y'
+    -> Maybe (ListZipper x', a')
   _Wrapped' =
     iso (\(ListZipperOp k) -> k) ListZipperOp
 
@@ -379,21 +402,28 @@ instance AsListZipperOp (ListZipperOp x y) x y where
 
 instance Functor (ListZipperOp x) where
   fmap f (ListZipperOp k) =
-    ListZipperOp (fmap f . k)
+    ListZipperOp (fmap (fmap f) . k)
 
 instance Apply (ListZipperOp x) where
   ListZipperOp j <.> ListZipperOp k =
-    ListZipperOp (\z -> j z <.> k z)
+    ListZipperOp (\z ->
+      j z >>= \(z', f) ->
+      k z' >>= \(z'', a) ->
+      pure (z'', f a)
+      )
 
 instance Applicative (ListZipperOp x) where
   (<*>) =
     (<.>)
-  pure =
-    ListZipperOp . pure . pure
+  pure a =
+    ListZipperOp (\z -> pure (z, a))
 
 instance Bind (ListZipperOp x) where
   ListZipperOp j >>- f =
-    ListZipperOp (\z -> j z >>- \a -> let ListZipperOp k = f a in k z)
+    ListZipperOp (\z -> 
+      j z >>- \(z', a) ->
+      z' & f a ^. _Wrapped
+      )
 
 instance Alt (ListZipperOp x) where
   ListZipperOp j <!> ListZipperOp k =
@@ -427,54 +457,81 @@ instance Monoid (ListZipperOp x y) where
   mempty =
     ListZipperOp (pure Nothing)
 
-instance Profunctor ListZipperOp where
-  dimap f g (ListZipperOp k) =
-    ListZipperOp (fmap g . k . fmap f)
-  rmap =
-    fmap
+instance MonadState (ListZipper x) (ListZipperOp x) where
+  get =
+    ListZipperOp (\z -> Just (z, z))
+  put z =
+    ListZipperOp (\_ -> Just (z, ()))
+  state k =
+    ListZipperOp (\z -> let (z', a) = k z in Just (a, z'))
 
-pureListZipperOp ::
-  (ListZipper a -> ListZipper a)
-  -> ListZipperOp' a
-pureListZipperOp k =
-  ListZipperOp (Just . k)
+instance MonadReader (ListZipper x) (ListZipperOp x) where
+  ask =
+    ListZipperOp (\z -> Just (z, z))
+  local k (ListZipperOp o) =
+    ListZipperOp (\z -> (\(z', a) -> (k z', a)) <$> o z)
+  reader k =
+    ListZipperOp (\z -> Just (z, k z))
+
+instance MonadFix (ListZipperOp x) where
+  mfix f =
+    ListZipperOp (\z ->
+      mfix (\ ~(_, a) -> z & f a ^. _Wrapped)
+      )
+
+instance MonadFail (ListZipperOp x) where
+  fail s =
+    ListZipperOp (\_ ->
+      Fail.fail s
+    )
+
+instance MonadError () (ListZipperOp x) where
+  throwError () =
+    ListZipperOp (\_ -> Nothing)
+  catchError (ListZipperOp k) f =
+    ListZipperOp (\z ->
+       k z <!> (z & f () ^. _Wrapped)
+     )
 
 unpureListZipperOp ::
-  ListZipperOp' a
-  -> ListZipper a
-  -> ListZipper a
-unpureListZipperOp (ListZipperOp x) =
-  fromMaybe <*> x
-
-idListZipperOp ::
-  ListZipperOp' a
-idListZipperOp =
-  ListZipperOp Just
-
-(&^.) ::
-  ListZipperOp x y
+  ListZipperOp x a
   -> ListZipper x
-  -> Maybe y
-(&^.) o z =
-  z & o ^. _Wrapped
+  -> ListZipper x
+unpureListZipperOp (ListZipperOp x) z =
+  case x z of
+    Nothing ->
+      z
+    Just (z', _) ->
+      z'
 
-infixr 5 &^.
+mkListZipperOp :: 
+  (ListZipper x -> Maybe a)
+  -> ListZipperOp x a
+mkListZipperOp f = 
+  ListZipperOp (\z ->
+    (\a -> (z, a)) <$> f z
+  )
+
+mkListZipperOp' ::
+  (ListZipper x -> Maybe (ListZipper x)) -> ListZipperOp' x
+mkListZipperOp' f = 
+  ListZipperOp (\s -> (\s' -> (s', ())) <$> f s)
 
 moveLeft ::
   ListZipperOp' a
 moveLeft =
-  ListZipperOp (\z ->
+  mkListZipperOp' (\z ->
     case z of
       ListZipper [] _ _ ->
         Nothing
       ListZipper (h:t) x r ->
         Just (ListZipper t h (x:r))
-  )
+    )
 
 moveRight ::
   ListZipperOp' a
 moveRight =
-  ListZipperOp (\z ->
+  mkListZipperOp' (\z ->
     case z of
       ListZipper _ _ [] ->
         Nothing
@@ -483,18 +540,18 @@ moveRight =
   )
 
 opUntil ::
-  ListZipperOp' a
-  -> (a -> Bool)
-  -> ListZipperOp' a
+  ListZipperOp x ()
+  -> (x -> Bool)
+  -> ListZipperOp x ()
 opUntil o p =
   ListZipperOp (\z ->
     let go z' =
           let x = z' ^. focus
           in  if p x
-                then
-                  Just z'
-                else
-                  go =<< o &^. z'
+                 then
+                   Just (z', ())
+                 else
+                   go =<< unListZipperOp' o z'
     in  go z
   )
 
@@ -522,52 +579,12 @@ moveRightLeftUntil ::
 moveRightLeftUntil p =
   moveRightUntil p <!> moveLeftUntil p
 
-opWith ::
-  ListZipperOp' a
-  -> (a -> Maybe b)
-  -> ListZipperOp a (b, a)
-opWith o p =
-  ListZipperOp (\z ->
-    let go z' =
-          let x = z' ^. focus
-          in  case p x of
-                Nothing ->
-                  go =<< o &^. z'
-                Just w ->
-                  Just (w, x)
-    in  go z
-  )
-
-moveLeftWith ::
-  (a -> Maybe b)
-  -> ListZipperOp a (b, a)
-moveLeftWith =
-  opWith moveLeft
-
-moveRightWith ::
-  (a -> Maybe b)
-  -> ListZipperOp a (b, a)
-moveRightWith =
-  opWith moveRight
-
-moveLeftRightWith ::
-  (a -> Maybe b)
-  -> ListZipperOp a (b, a)
-moveLeftRightWith p =
-  moveLeftWith p <!> moveRightWith p
-
-moveRightLeftWith ::
-  (a -> Maybe b)
-  -> ListZipperOp a (b, a)
-moveRightLeftWith p =
-  moveRightWith p <!> moveLeftWith p
-
 opWhileJust ::
   ListZipperOp' a
   -> ListZipper a
   -> ListZipper a
 opWhileJust o z =
-  case o &^. z of
+  case unListZipperOp' o z of
     Nothing ->
       z
     Just z' ->
@@ -576,7 +593,7 @@ opWhileJust o z =
 deleteStepLeft ::
   ListZipperOp' a
 deleteStepLeft =
-  ListZipperOp (\z ->
+  mkListZipperOp' (\z ->
     let l = z ^. leftz
         r = z ^. rightz
     in  case l of
@@ -589,7 +606,7 @@ deleteStepLeft =
 deleteStepRight ::
   ListZipperOp' a
 deleteStepRight =
-  ListZipperOp (\z ->
+  mkListZipperOp' (\z ->
     let l = z ^. leftz
         r = z ^. rightz
     in  case r of
@@ -598,20 +615,6 @@ deleteStepRight =
           h:t ->
             Just (ListZipper l h t)
   )
-
-insertMoveLeft ::
-  a
-  -> ListZipper a
-  -> ListZipper a
-insertMoveLeft a (ListZipper l x r) =
-  ListZipper (a:l) x r
-
-insertMoveRight ::
-  a
-  -> ListZipper a
-  -> ListZipper a
-insertMoveRight a (ListZipper l x r) =
-  ListZipper l x (a:r)
 
 deriveEq1 ''ListZipper
 deriveShow1 ''ListZipper

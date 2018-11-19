@@ -1,6 +1,11 @@
+0.0.3
+
+* Use state for `ListZipperOp`
+* remove `opWith` and applications
+
 0.0.2
 
-* add `opUntil` and applications
+* add `opWith` and applications
 * make `ListZipperOp` more general
 
 0.0.1
