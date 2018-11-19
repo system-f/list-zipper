@@ -4,7 +4,7 @@
 }:
 mkDerivation {
   pname = "list-zipper";
-  version = "0.0.3";
+  version = "0.0.5";
   src = ./.;
   libraryHaskellDepends = [
     base comonad deriving-compat lens mtl semigroupoids semigroups

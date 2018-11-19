@@ -1,3 +1,7 @@
+0.0.5
+
+* more function
+
 0.0.4
 
 * lots more functions
