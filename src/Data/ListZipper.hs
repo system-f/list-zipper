@@ -364,26 +364,26 @@ insertMoveRight a (ListZipper l x r) =
 
 ----
 
-newtype ListZipperOp x a =
-  ListZipperOp (ListZipper x -> Maybe (ListZipper x, a))
+newtype ListZipperOp a b =
+  ListZipperOp (ListZipper a -> Maybe (ListZipper a, b))
 
-type ListZipperOp' x =
-  ListZipperOp x ()
+type ListZipperOp' a =
+  ListZipperOp a ()
 
 unListZipperOp' ::
-  ListZipperOp' x
-  -> ListZipper x
-  -> Maybe (ListZipper x)
+  ListZipperOp' a
+  -> ListZipper a
+  -> Maybe (ListZipper a)
 unListZipperOp' o z =
   fmap (^. _1) (z & o ^. _Wrapped)
 
-instance ListZipperOp x a ~ t =>
-  Rewrapped (ListZipperOp x' a') t
+instance ListZipperOp a x ~ t =>
+  Rewrapped (ListZipperOp b' a') t
 
-instance Wrapped (ListZipperOp x' a') where
-  type Unwrapped (ListZipperOp x' a') =
-    ListZipper x'
-    -> Maybe (ListZipper x', a')
+instance Wrapped (ListZipperOp a' x') where
+  type Unwrapped (ListZipperOp a' x') =
+    ListZipper a'
+    -> Maybe (ListZipper a', x')
   _Wrapped' =
     iso (\(ListZipperOp k) -> k) ListZipperOp
 
@@ -402,11 +402,11 @@ instance AsListZipperOp (ListZipperOp x y) x y where
   _ListZipperOp =
     id
 
-instance Functor (ListZipperOp x) where
+instance Functor (ListZipperOp a) where
   fmap f (ListZipperOp k) =
     ListZipperOp (fmap (fmap f) . k)
 
-instance Apply (ListZipperOp x) where
+instance Apply (ListZipperOp a) where
   ListZipperOp j <.> ListZipperOp k =
     ListZipperOp (\z ->
       j z >>= \(z', f) ->
@@ -414,20 +414,20 @@ instance Apply (ListZipperOp x) where
       pure (z'', f a)
       )
 
-instance Applicative (ListZipperOp x) where
+instance Applicative (ListZipperOp a) where
   (<*>) =
     (<.>)
   pure a =
     ListZipperOp (\z -> pure (z, a))
 
-instance Bind (ListZipperOp x) where
+instance Bind (ListZipperOp a) where
   ListZipperOp j >>- f =
     ListZipperOp (\z -> 
       j z >>- \(z', a) ->
       z' & f a ^. _Wrapped
       )
 
-instance Alt (ListZipperOp x) where
+instance Alt (ListZipperOp a) where
   ListZipperOp j <!> ListZipperOp k =
     ListZipperOp (\z -> j z <!> k z)
 
@@ -437,29 +437,29 @@ instance Alternative (ListZipperOp x) where
   empty =
     ListZipperOp (pure empty)
 
-instance Monad (ListZipperOp x) where
+instance Monad (ListZipperOp a) where
   (>>=) =
     (>>-)
   return =
     pure
 
-instance MonadPlus (ListZipperOp x) where
+instance MonadPlus (ListZipperOp a) where
   ListZipperOp j `mplus` ListZipperOp k =
     ListZipperOp (\z -> j z `mplus` k z)
   mzero =
     ListZipperOp (pure mzero)
 
-instance Semigroup (ListZipperOp x y) where
+instance Semigroup (ListZipperOp a b) where
   ListZipperOp j <> ListZipperOp k =
     ListZipperOp (\z -> j z <!> k z)
 
-instance Monoid (ListZipperOp x y) where
+instance Monoid (ListZipperOp a b) where
   mappend =
     (<>)
   mempty =
     ListZipperOp (pure Nothing)
 
-instance MonadState (ListZipper x) (ListZipperOp x) where
+instance MonadState (ListZipper a) (ListZipperOp a) where
   get =
     ListZipperOp (\z -> Just (z, z))
   put z =
@@ -467,7 +467,7 @@ instance MonadState (ListZipper x) (ListZipperOp x) where
   state k =
     ListZipperOp (\z -> let (z', a) = k z in Just (a, z'))
 
-instance MonadReader (ListZipper x) (ListZipperOp x) where
+instance MonadReader (ListZipper a) (ListZipperOp a) where
   ask =
     ListZipperOp (\z -> Just (z, z))
   local k (ListZipperOp o) =
@@ -475,19 +475,19 @@ instance MonadReader (ListZipper x) (ListZipperOp x) where
   reader k =
     ListZipperOp (\z -> Just (z, k z))
 
-instance MonadFix (ListZipperOp x) where
+instance MonadFix (ListZipperOp a) where
   mfix f =
     ListZipperOp (\z ->
       mfix (\ ~(_, a) -> z & f a ^. _Wrapped)
       )
 
-instance MonadFail (ListZipperOp x) where
+instance MonadFail (ListZipperOp a) where
   fail s =
     ListZipperOp (\_ ->
       Fail.fail s
     )
 
-instance MonadError () (ListZipperOp x) where
+instance MonadError () (ListZipperOp a) where
   throwError () =
     ListZipperOp (\_ -> Nothing)
   catchError (ListZipperOp k) f =
@@ -496,9 +496,9 @@ instance MonadError () (ListZipperOp x) where
      )
 
 unpureListZipperOp ::
-  ListZipperOp x a
-  -> ListZipper x
-  -> ListZipper x
+  ListZipperOp a b
+  -> ListZipper a
+  -> ListZipper a
 unpureListZipperOp (ListZipperOp x) z =
   case x z of
     Nothing ->
@@ -507,30 +507,30 @@ unpureListZipperOp (ListZipperOp x) z =
       z'
 
 mkListZipperOp :: 
-  (ListZipper x -> Maybe a)
-  -> ListZipperOp x a
+  (ListZipper a -> Maybe b)
+  -> ListZipperOp a b
 mkListZipperOp f = 
   ListZipperOp (\z ->
     (\a -> (z, a)) <$> f z
   )
 
 (*>>) :: 
-  (ListZipper x -> Maybe a)
-  -> ListZipperOp x a
+  (ListZipper a -> Maybe b)
+  -> ListZipperOp a b
 (*>>) =
   mkListZipperOp
 
 infixl 5 *>>
 
 mkListZipperOp' ::
-  (ListZipper x -> Maybe (ListZipper x))
-  -> ListZipperOp' x
+  (ListZipper a -> Maybe (ListZipper a))
+  -> ListZipperOp' a
 mkListZipperOp' f = 
   ListZipperOp (\s -> (\s' -> (s', ())) <$> f s)
 
 (.>>) ::
-  (ListZipper x -> Maybe (ListZipper x))
-  -> ListZipperOp' x
+  (ListZipper a -> Maybe (ListZipper a))
+  -> ListZipperOp' a
 (.>>) =
   mkListZipperOp'
 
@@ -559,9 +559,9 @@ moveRight =
   )
 
 opUntil ::
-  ListZipperOp x ()
-  -> (x -> Bool)
-  -> ListZipperOp x ()
+  ListZipperOp a ()
+  -> (a -> Bool)
+  -> ListZipperOp a ()
 opUntil o p =
   ListZipperOp (\z ->
     let go z' =
