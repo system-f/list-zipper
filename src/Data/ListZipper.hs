@@ -50,7 +50,7 @@ module Data.ListZipper(
 , deleteStepRight
 ) where
 
-import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty))
+import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty), (<*))
 import Control.Category((.), id)
 import Control.Comonad(Comonad(duplicate, extract))
 import Control.Lens(Each(each), Reversing(reversing), Ixed(ix), Rewrapped, Wrapped(Unwrapped, _Wrapped'), IxValue, Index, Prism', Lens', Traversal', _Wrapped, (^.), iso, (&), _1)
@@ -516,9 +516,10 @@ mkListZipperOp f =
 
 (*>>) :: 
   (ListZipper a -> Maybe b)
+  -> ListZipperOp a c
   -> ListZipperOp a b
-(*>>) =
-  mkListZipperOp
+f *>> k =
+  mkListZipperOp f <* k
 
 infixl 5 *>>
 
@@ -530,9 +531,10 @@ mkListZipperOp' f =
 
 (.>>) ::
   (ListZipper a -> Maybe (ListZipper a))
+  -> ListZipperOp a b
   -> ListZipperOp' a
-(.>>) =
-  mkListZipperOp'
+f .>> k =
+  mkListZipperOp' f <* k
 
 infixl 5 .>>
 
