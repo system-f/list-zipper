@@ -30,7 +30,6 @@ module Data.ListZipper(
 , insertMoveRight
 , ListZipperOp(..)
 , ListZipperOp'
-, unListZipperOp'
 , HasListZipperOp(..)
 , AsListZipperOp(..)
 , unpureListZipperOp
@@ -40,6 +39,19 @@ module Data.ListZipper(
 , mkListZipperOp'
 , (.>>)
 , (<<.)
+, runListZipperOp
+, execListZipperOp
+, (##>)
+, (<##)
+, evalListZipperOp
+, (&&>)
+, (<&&)
+, execOpList
+, (%%>)
+, (<%%)
+, execOpList'
+, ($$>)
+, (<$$)
 , moveLeft
 , moveRight
 , opUntil
@@ -55,7 +67,7 @@ module Data.ListZipper(
 import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty), (<*))
 import Control.Category((.), id)
 import Control.Comonad(Comonad(duplicate, extract))
-import Control.Lens(Each(each), Reversing(reversing), Ixed(ix), Rewrapped, Wrapped(Unwrapped, _Wrapped'), IxValue, Index, Prism', Lens', Traversal', _Wrapped, (^.), iso, (&), _1)
+import Control.Lens(Each(each), Reversing(reversing), Ixed(ix), Rewrapped, Wrapped(Unwrapped, _Wrapped'), IxValue, Index, Prism', Lens', Traversal', _Wrapped, (^.), iso, (&), _1, _2)
 import Control.Monad.Error.Class(MonadError(throwError, catchError))
 import Control.Monad.Fail(MonadFail(fail))
 import Control.Monad.Fix(MonadFix(mfix))
@@ -170,7 +182,7 @@ instance Extend ListZipper where
     let dup x =
           (x, x)
         unf m =
-          unfoldr (fmap dup . (unListZipperOp' m)) z
+          unfoldr (fmap dup . (execListZipperOp m)) z
     in  ListZipper (unf moveLeft) z (unf moveRight)
 
 instance Comonad ListZipper where
@@ -343,13 +355,13 @@ moveLeftLoop ::
   ListZipper a
   -> ListZipper a
 moveLeftLoop z =
-  fromMaybe (moveEnd z) (unListZipperOp' moveLeft z)
+  fromMaybe (moveEnd z) (execListZipperOp moveLeft z)
 
 moveRightLoop ::
   ListZipper a
   -> ListZipper a
 moveRightLoop z =
-  fromMaybe (moveStart z) (unListZipperOp' moveRight z)
+  fromMaybe (moveStart z) (execListZipperOp moveRight z)
 
 insertMoveLeft ::
   a
@@ -372,13 +384,6 @@ newtype ListZipperOp a b =
 
 type ListZipperOp' a =
   ListZipperOp a ()
-
-unListZipperOp' ::
-  ListZipperOp' a
-  -> ListZipper a
-  -> Maybe (ListZipper a)
-unListZipperOp' o z =
-  fmap (^. _1) (z & o ^. _Wrapped)
 
 instance ListZipperOp a x ~ t =>
   Rewrapped (ListZipperOp b' a') t
@@ -559,6 +564,117 @@ infixl 5 .>>
 
 infixl 5 <<.
 
+runListZipperOp ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> Maybe (ListZipper a, x)
+runListZipperOp (ListZipperOp o) z =
+  o z
+
+execListZipperOp ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> Maybe (ListZipper a)
+execListZipperOp o =
+  fmap (^. _1) . runListZipperOp o
+
+(##>) ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> Maybe (ListZipper a)
+(##>) =
+  execListZipperOp
+
+infixl 6 ##>
+
+(<##) ::
+  ListZipper a
+  -> ListZipperOp a x
+  -> Maybe (ListZipper a)
+(<##) =
+  flip (##>)
+
+infixl 6 <##
+
+evalListZipperOp ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> Maybe x
+evalListZipperOp o =
+  fmap (^. _2) . runListZipperOp o
+
+(&&>) ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> Maybe x
+(&&>) =
+  evalListZipperOp
+
+infixl 6 &&>
+
+(<&&) ::
+  ListZipper a
+  -> ListZipperOp a x
+  -> Maybe x
+(<&&) =
+  flip (&&>)
+
+infixl 6 <&&
+
+execOpList ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> Maybe [a]
+execOpList o =
+  fmap list . execListZipperOp o
+
+(%%>) ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> Maybe [a]
+(%%>) =
+  execOpList
+
+infixl 5 %%>
+
+(<%%) ::
+  ListZipper a
+  -> ListZipperOp a x
+  -> Maybe [a]
+(<%%) =
+  flip (%%>)
+
+infixl 5 <%%
+
+execOpList' ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> [a]
+execOpList' o z =
+  case execOpList o z of
+    Nothing ->
+      []
+    Just x ->
+      x
+
+($$>) ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> [a]
+($$>) =
+  execOpList'
+
+infixl 5 $$>
+
+(<$$) ::
+  ListZipper a
+  -> ListZipperOp a x
+  -> [a]
+(<$$) =
+  flip ($$>)
+
+infixl 5 <$$
+
 moveLeft ::
   ListZipperOp' a
 moveLeft =
@@ -582,9 +698,9 @@ moveRight =
   )
 
 opUntil ::
-  ListZipperOp a ()
+  ListZipperOp a x
   -> (a -> Bool)
-  -> ListZipperOp a ()
+  -> ListZipperOp' a
 opUntil o p =
   ListZipperOp (\z ->
     let go z' =
@@ -593,7 +709,7 @@ opUntil o p =
                  then
                    Just (z', ())
                  else
-                   go =<< unListZipperOp' o z'
+                   go =<< execListZipperOp o z'
     in  go z
   )
 
@@ -626,7 +742,7 @@ opWhileJust ::
   -> ListZipper a
   -> ListZipper a
 opWhileJust o z =
-  case unListZipperOp' o z of
+  case execListZipperOp o z of
     Nothing ->
       z
     Just z' ->
