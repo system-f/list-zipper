@@ -62,11 +62,21 @@ module Data.ListZipper(
 , moveRightWith
 , moveLeftRightWith
 , moveRightLeftWith
+, opWithThen
+, moveLeftWithThen
+, moveRightWithThen
+, moveLeftRightWithThen
+, moveRightLeftWithThen
 , opUntil
 , moveLeftUntil
 , moveRightUntil
 , moveLeftRightUntil
 , moveRightLeftUntil
+, opUntilThen
+, moveLeftUntilThen
+, moveRightUntilThen
+, moveLeftRightUntilThen
+, moveRightLeftUntilThen
 , opWhileJust
 , deleteStepLeft
 , deleteStepRight
@@ -754,6 +764,37 @@ moveRightLeftWith ::
 moveRightLeftWith p =
   moveRightWith p <!> moveLeftWith p
 
+opWithThen ::
+  ListZipperOp a b
+  -> (a -> Maybe c)
+  -> ListZipperOp a c
+opWithThen o p =
+  opWith o p <* o
+
+moveLeftWithThen ::
+  (a -> Maybe c)
+  -> ListZipperOp a c
+moveLeftWithThen =
+  opWithThen moveLeft
+
+moveRightWithThen ::
+  (a -> Maybe c)
+  -> ListZipperOp a c
+moveRightWithThen =
+  opWithThen moveRight
+
+moveLeftRightWithThen ::
+  (a -> Maybe c)
+  -> ListZipperOp a c
+moveLeftRightWithThen p =
+  moveLeftWithThen p <!> moveRightWithThen p
+
+moveRightLeftWithThen ::
+  (a -> Maybe c)
+  -> ListZipperOp a c
+moveRightLeftWithThen p =
+  moveRightWithThen p <!> moveLeftWithThen p
+
 opUntil ::
   ListZipperOp a x
   -> (a -> Bool)
@@ -784,6 +825,37 @@ moveRightLeftUntil ::
   -> ListZipperOp' a
 moveRightLeftUntil p =
   moveRightUntil p <!> moveLeftUntil p
+
+opUntilThen ::
+  ListZipperOp a x
+  -> (a -> Bool)
+  -> ListZipperOp' a
+opUntilThen o p =
+  opUntil o p <* o
+
+moveLeftUntilThen ::
+  (a -> Bool)
+  -> ListZipperOp' a
+moveLeftUntilThen =
+  opUntilThen moveLeft
+
+moveRightUntilThen ::
+  (a -> Bool)
+  -> ListZipperOp' a
+moveRightUntilThen =
+  opUntilThen moveRight
+
+moveLeftRightUntilThen ::
+  (a -> Bool)
+  -> ListZipperOp' a
+moveLeftRightUntilThen p =
+  moveLeftUntilThen p <!> moveRightUntilThen p
+
+moveRightLeftUntilThen ::
+  (a -> Bool)
+  -> ListZipperOp' a
+moveRightLeftUntilThen p =
+  moveRightUntilThen p <!> moveLeftUntilThen p
 
 opWhileJust ::
   ListZipperOp' a
