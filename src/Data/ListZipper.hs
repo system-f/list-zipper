@@ -524,22 +524,22 @@ instance MonadError () (ListZipperOp a) where
 getFocus ::
   ListZipperOp a a
 getFocus =
-  ListZipperOp (\z -> Just (z, z ^. focus))
+  reader (^. focus)
 
 getRightz ::
   ListZipperOp a [a]
 getRightz =
-  ListZipperOp (\z -> Just (z, z ^. rightz))
+  reader (^. rightz)
 
 getLeftz ::
   ListZipperOp a [a]
 getLeftz =
-  ListZipperOp (\z -> Just (z, z ^. leftz))
+  reader (^. leftz)
 
 getList ::
   ListZipperOp a [a]
 getList =
-  ListZipperOp (\z -> Just (z, list z))
+  reader list
 
 mkListZipperOp :: 
   (ListZipper a -> Maybe b)
