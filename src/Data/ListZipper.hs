@@ -357,8 +357,8 @@ moveStart =
 moveEnd ::
   ListZipper a
   -> ListZipper a
-moveEnd =
-  opWhileJust moveRight
+moveEnd z =
+  opWhileJust moveRight z -- *> moveRight
 
 atStart ::
   HasListZipper z a =>
