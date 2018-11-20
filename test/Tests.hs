@@ -16,12 +16,12 @@ import Data.Function(($))
 import Data.Functor((<$>))
 import Data.List(zip)
 import Data.List.NonEmpty(NonEmpty((:|)))
-import Data.ListZipper(ListZipper(ListZipper), ListZipperOp', moveLeft, moveRight, moveLeftUntil, moveRightUntil, moveLeftRightUntil, moveRightLeftUntil, moveLeftUntilThen, moveRightUntilThen, moveLeftRightUntilThen, moveRightLeftUntilThen, list, (##>), deleteStepLeft, deleteStepRight, runListZipperOp, execListZipperOp, moveEnd, moveStart, atStart, atEnd, zipper0L, zipper0L', moveLeftLoop, moveRightLoop, insertMoveLeft, insertMoveRight, focus, zipperIndices)
+import Data.ListZipper(ListZipper(ListZipper), ListZipperOp', moveLeft, moveRight, moveLeftUntil, moveRightUntil, moveLeftRightUntil, moveRightLeftUntil, moveLeftUntilThen, moveRightUntilThen, moveLeftRightUntilThen, moveRightLeftUntilThen, list, (##>), deleteStepLeft, deleteStepRight, runListZipperOp, execListZipperOp, moveEnd, moveStart, atStart, atEnd, zipper0L, zipper0L', moveLeftLoop, moveRightLoop, insertMoveLeft, insertMoveRight, focus, zipperIndices, moveRightWith, moveLeftWith)
 import Data.Maybe(Maybe(Nothing, Just))
 import Data.String(String)
 import Hedgehog(Gen, Property, property, forAll, forAllWith, (===))
 import Hedgehog.Function(Arg, Vary, forAllFn, fn)
-import qualified Hedgehog.Gen as Gen(list, element, bool, int)
+import qualified Hedgehog.Gen as Gen(list, element, bool, int, maybe)
 import qualified Hedgehog.Range as Range(linear)
 import Prelude(Show)
 import System.IO(IO)
@@ -56,6 +56,7 @@ listzipper_properties =
     , testProperty "insertMoveLeft gets correct focus" prop_insertMoveLeft_focus'
     , testProperty "insertMoveLeft gets correct focus" prop_insertMoveRight_focus'
     , testProperty "zipperIndices are linear" prop_indices'
+    , testProperty "moveRightWith focus satisfies" prop_moveRightWith'
     ]
 
 genListZipper ::
@@ -370,3 +371,39 @@ prop_indices' ::
   Property
 prop_indices' =
   prop_indices (Gen.int (Range.linear 0 9999))
+
+prop_moveRightWith ::
+  forall a c.
+  (Eq a, Show a, Arg a, Vary a, Show c, Eq c) =>
+  Gen a
+  -> Gen c
+  -> Property
+prop_moveRightWith genA genC =
+  property $
+    do  z <- forAll (genListZipper genA)
+        f <- forAllFn (fn @a (Gen.maybe genC))
+        let t = moveRightWith f `runListZipperOp` z
+        traverse_ (\(z', x) -> Just x === (f (z' ^. focus))) t
+
+prop_moveRightWith' ::
+  Property
+prop_moveRightWith' =
+  prop_moveRightWith (Gen.int (Range.linear 0 99)) (Gen.int (Range.linear 0 99))
+
+prop_moveLeftWith ::
+  forall a c.
+  (Eq a, Show a, Arg a, Vary a, Show c, Eq c) =>
+  Gen a
+  -> Gen c
+  -> Property
+prop_moveLeftWith genA genC =
+  property $
+    do  z <- forAll (genListZipper genA)
+        f <- forAllFn (fn @a (Gen.maybe genC))
+        let t = moveLeftWith f `runListZipperOp` z
+        traverse_ (\(z', x) -> Just x === (f (z' ^. focus))) t
+
+prop_moveLeftWith' ::
+  Property
+prop_moveLeftWith' =
+  prop_moveLeftWith (Gen.int (Range.linear 0 99)) (Gen.int (Range.linear 0 99))
