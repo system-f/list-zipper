@@ -894,29 +894,25 @@ opWhileJust o z =
       opWhileJust o z'
 
 deleteStepLeft ::
-  ListZipperOp' a
+  ListZipperOp a a
 deleteStepLeft =
-  mkListZipperOp' (\z ->
-    let l = z ^. leftz
-        r = z ^. rightz
-    in  case l of
-          [] ->
-            Nothing
-          h:t ->
-            Just (ListZipper t h r)
+  ListZipperOp (\(ListZipper l x r) ->
+    case l of
+      [] ->
+        Nothing
+      h:t ->
+        Just (ListZipper t h r, x)
   )
 
 deleteStepRight ::
-  ListZipperOp' a
+  ListZipperOp a a
 deleteStepRight =
-  mkListZipperOp' (\z ->
-    let l = z ^. leftz
-        r = z ^. rightz
-    in  case r of
-          [] ->
-            Nothing
-          h:t ->
-            Just (ListZipper l h t)
+  ListZipperOp (\(ListZipper l x r) ->
+    case r of
+      [] ->
+        Nothing
+      h:t ->
+        Just (ListZipper l h t, x)
   )
 
 deriveEq1 ''ListZipper

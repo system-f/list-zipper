@@ -50,14 +50,17 @@ library
 
 test-suite          tests
 
-  build-depends:      QuickCheck >=2.9.2 && <2.13
-                    , base >=4.8 && < 5
-                    , checkers >=0.4.6 && <0.5
+  build-depends:      QuickCheck >= 2.9.2 && < 2.13
+                    , base >= 4.8 && < 5
+                    , checkers >= 0.4.6 && < 0.5
                     , list-zipper
-                    , lens >=4 && <4.18
-                    , tasty >=0.11 && <1.2
-                    , tasty-hunit >=0.9 && <0.11
-                    , tasty-quickcheck >=0.8.4 && <0.11
+                    , lens >= 4 && < 4.18
+                    , tasty >= 0.11 && < 1.2
+                    , tasty-hunit >= 0.9 && < 0.11
+                    , tasty-quickcheck >= 0.8.4 && < 0.11
+                    , hedgehog >= 0.6 && < 0.7
+                    , hedgehog-fn >= 0.6 && < 0.7
+                    , tasty-hedgehog >= 0.2 && < 0.3
 
   type:             
                     exitcode-stdio-1.0
