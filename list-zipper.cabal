@@ -1,5 +1,5 @@
 name:               list-zipper
-version:            0.0.5
+version:            0.0.6
 license:            BSD3
 license-file:       LICENCE
 author:             Queensland Functional Programming Lab <oᴉ˙ldɟb@llǝʞsɐɥ>
@@ -63,7 +63,7 @@ test-suite          tests
                     , tasty-hedgehog >= 0.2 && < 0.3
                     , transformers >=0.4.1 && <5.5
                     , mtl >=2.2 && <2.3
-                    
+
   type:             
                     exitcode-stdio-1.0
 

@@ -1,6 +1,11 @@
+0.0.6
+
+* tests
+* more functions
+
 0.0.5
 
-* more function
+* more functions
 
 0.0.4
 
