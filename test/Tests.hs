@@ -27,6 +27,7 @@ import Prelude(Show)
 import System.IO(IO)
 import Test.Tasty(TestTree, defaultMain, testGroup)
 import Test.Tasty.Hedgehog(testProperty)
+import Build_doctests (flags, pkgs, module_sources)
 
 main ::
   IO ()
