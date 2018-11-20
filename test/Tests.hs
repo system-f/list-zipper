@@ -16,7 +16,7 @@ import Data.Function(($))
 import Data.Functor((<$>))
 import Data.List(zip)
 import Data.List.NonEmpty(NonEmpty((:|)))
-import Data.ListZipper(ListZipper(ListZipper), ListZipperOp', moveLeft, moveRight, moveLeftUntil, moveRightUntil, moveLeftRightUntil, moveRightLeftUntil, moveLeftUntilThen, moveRightUntilThen, moveLeftRightUntilThen, moveRightLeftUntilThen, list, (##>), deleteStepLeft, deleteStepRight, runListZipperOp, execListZipperOp, moveEnd, moveStart, atStart, atEnd, zipper0L, zipper0L', moveLeftLoop, moveRightLoop, insertMoveLeft, insertMoveRight, focus, zipperIndices, moveRightWith, moveLeftWith, moveLeftRightWith, moveRightLeftWith, moveRightWithThen, moveLeftWithThen, moveLeftRightWithThen, moveRightLeftWithThen)
+import Data.ListZipper(ListZipper(ListZipper), ListZipperOp', moveLeft, moveRight, moveLeftUntil, moveRightUntil, moveLeftRightUntil, moveRightLeftUntil, moveLeftUntilThen, moveRightUntilThen, moveLeftRightUntilThen, moveRightLeftUntilThen, list, (##>), deleteStepLeft, deleteStepRight, runListZipperOp, execListZipperOp, moveEnd, moveStart, atStart, atEnd, zipper0L, zipper0L', moveLeftLoop, moveRightLoop, insertMoveLeft, insertMoveRight, focus, zipperIndices, moveRightWith, moveLeftWith, moveLeftRightWith, moveRightLeftWith, moveRightWithThen, moveLeftWithThen)
 import Data.Maybe(Maybe(Nothing, Just))
 import Data.String(String)
 import Hedgehog(Gen, Property, property, forAll, forAllWith, (===))
@@ -27,9 +27,6 @@ import Prelude(Show)
 import System.IO(IO)
 import Test.Tasty(TestTree, defaultMain, testGroup)
 import Test.Tasty.Hedgehog(testProperty)
-
-import Control.Monad.IO.Class
-import Prelude((>), show, (+), Int, print)
 
 main ::
   IO ()
