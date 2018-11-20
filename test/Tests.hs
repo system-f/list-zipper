@@ -5,6 +5,8 @@
 module Main where
 
 import Control.Applicative(pure, (*>))
+import Control.Category((.))
+import Control.Lens((^.))
 import Control.Monad(replicateM_)
 import Control.Monad.State(modify)
 import Data.Bool(Bool(True, False))
@@ -12,7 +14,9 @@ import Data.Eq(Eq)
 import Data.Foldable(traverse_)
 import Data.Function(($))
 import Data.Functor((<$>))
-import Data.ListZipper(ListZipper(ListZipper), ListZipperOp', moveLeft, moveRight, moveLeftUntil, moveRightUntil, moveLeftRightUntil, moveRightLeftUntil, moveLeftUntilThen, moveRightUntilThen, moveLeftRightUntilThen, moveRightLeftUntilThen, list, (##>), deleteStepLeft, deleteStepRight, runListZipperOp, execListZipperOp, moveEnd, moveStart, atStart, atEnd)
+import Data.List(zip)
+import Data.List.NonEmpty(NonEmpty((:|)))
+import Data.ListZipper(ListZipper(ListZipper), ListZipperOp', moveLeft, moveRight, moveLeftUntil, moveRightUntil, moveLeftRightUntil, moveRightLeftUntil, moveLeftUntilThen, moveRightUntilThen, moveLeftRightUntilThen, moveRightLeftUntilThen, list, (##>), deleteStepLeft, deleteStepRight, runListZipperOp, execListZipperOp, moveEnd, moveStart, atStart, atEnd, zipper0L, zipper0L', moveLeftLoop, moveRightLoop, insertMoveLeft, insertMoveRight, focus, zipperIndices)
 import Data.Maybe(Maybe(Nothing, Just))
 import Data.String(String)
 import Hedgehog(Gen, Property, property, forAll, forAllWith, (===))
@@ -43,8 +47,15 @@ listzipper_properties =
     , testProperty "move start cannot move left" prop_moveStart_cannot_moveLeft'
     , testProperty "move start is at start" prop_moveStart_atStart'
     , testProperty "move end is at end" prop_moveEnd_atEnd'
-    -- , testProperty "move start then move right is not at start" prop_moveStart_moveRight_not_atStart'
+    , testProperty "move start then move right is not at start" prop_moveStart_moveRight_not_atStart'
     , testProperty "move end then move left is not at end" prop_moveEnd_moveLeft_not_atEnd'
+    , testProperty "move zipper0L rezip is same list" prop_zipper0L_list'
+    , testProperty "move zipper0L' rezip is same list" prop_zipper0L'_list'
+    , testProperty "moveLeftLoop start is at end" prop_moveLeftLoop_start_atEnd'
+    , testProperty "moveRightLoop end is at start" prop_moveRightLoop_end_atStart'
+    , testProperty "insertMoveLeft gets correct focus" prop_insertMoveLeft_focus'
+    , testProperty "insertMoveLeft gets correct focus" prop_insertMoveRight_focus'
+    , testProperty "zipperIndices are linear" prop_indices'
     ]
 
 genListZipper ::
@@ -218,7 +229,7 @@ prop_moveStart_moveRight_not_atStart ::
 prop_moveStart_moveRight_not_atStart genA =
   property $
     do  z <- forAll (genListZipper genA)
-        n <- forAll (Gen.int (Range.linear 1 9999))
+        n <- forAll (Gen.int (Range.linear 1 99))
         let t = (modify moveStart *> replicateM_ n moveRight) `execListZipperOp` z
         traverse_ (\z' -> atStart z' === False) t
 
@@ -236,9 +247,126 @@ prop_moveEnd_moveLeft_not_atEnd genA =
     do  z <- forAll (genListZipper genA)
         n <- forAll (Gen.int (Range.linear 1 9999))
         let t = (modify moveEnd *> replicateM_ n moveLeft) `execListZipperOp` z
-        traverse_ (\z' -> atStart z' === False) t
+        traverse_ (\z' -> atEnd z' === False) t
 
 prop_moveEnd_moveLeft_not_atEnd' ::
   Property
 prop_moveEnd_moveLeft_not_atEnd' =
   prop_moveEnd_moveLeft_not_atEnd (Gen.int (Range.linear 0 9999))
+
+prop_zipper0L_list ::
+  forall a.
+  (Eq a, Show a, Vary a, Arg a) =>
+  Gen a
+  -> Property
+prop_zipper0L_list genA =
+  property $
+    do  hd     <- forAll genA
+        tl     <- forAll (Gen.list (Range.linear 0 100) genA)
+        f      <- forAllFn (fn @a Gen.bool)
+        (o, _) <- forAllWith (\(_, s) -> s) (noeditOperation' f)
+        n      <- forAll (Gen.int (Range.linear 1 99))
+        let t = list <$> replicateM_ n o `execListZipperOp` (zipper0L hd tl)
+        traverse_ (=== hd:tl) t
+        
+prop_zipper0L_list' ::
+  Property
+prop_zipper0L_list' =
+  prop_zipper0L_list (Gen.int (Range.linear 0 9999))
+
+prop_zipper0L'_list ::
+  forall a.
+  (Eq a, Show a, Vary a, Arg a) =>
+  Gen a
+  -> Property
+prop_zipper0L'_list genA =
+  property $
+    do  hd     <- forAll genA
+        tl     <- forAll (Gen.list (Range.linear 0 100) genA)
+        f      <- forAllFn (fn @a Gen.bool)
+        (o, _) <- forAllWith (\(_, s) -> s) (noeditOperation' f)
+        n      <- forAll (Gen.int (Range.linear 1 99))
+        let t = list <$> replicateM_ n o `execListZipperOp` (zipper0L' (hd :| tl))
+        traverse_ (=== hd:tl) t
+        
+prop_zipper0L'_list' ::
+  Property
+prop_zipper0L'_list' =
+  prop_zipper0L'_list (Gen.int (Range.linear 0 9999))
+
+prop_moveLeftLoop_start_atEnd ::
+  (Eq a, Show a) =>
+  Gen a
+  -> Property
+prop_moveLeftLoop_start_atEnd genA =
+  property $
+    do  z <- forAll (genListZipper genA)
+        atEnd ((moveLeftLoop . moveStart) z) === True
+
+prop_moveLeftLoop_start_atEnd' ::
+  Property
+prop_moveLeftLoop_start_atEnd' =
+  prop_moveLeftLoop_start_atEnd (Gen.int (Range.linear 0 9999))
+
+prop_moveRightLoop_end_atStart ::
+  (Eq a, Show a) =>
+  Gen a
+  -> Property
+prop_moveRightLoop_end_atStart genA =
+  property $
+    do  z <- forAll (genListZipper genA)
+        atStart ((moveRightLoop . moveEnd) z) === True
+
+prop_moveRightLoop_end_atStart' ::
+  Property
+prop_moveRightLoop_end_atStart' =
+  prop_moveRightLoop_end_atStart (Gen.int (Range.linear 0 9999))
+
+prop_insertMoveLeft_focus ::
+  (Eq a, Show a) =>
+  Gen a
+  -> Property
+prop_insertMoveLeft_focus genA =
+  property $
+    do  a <- forAll genA
+        z <- forAll (genListZipper genA)
+        insertMoveLeft a z ^. focus === a
+
+prop_insertMoveLeft_focus' ::
+  Property
+prop_insertMoveLeft_focus' =
+  prop_insertMoveLeft_focus (Gen.int (Range.linear 0 9999))
+
+prop_insertMoveRight_focus ::
+  (Eq a, Show a) =>
+  Gen a
+  -> Property
+prop_insertMoveRight_focus genA =
+  property $
+    do  a <- forAll genA
+        z <- forAll (genListZipper genA)
+        insertMoveRight a z ^. focus === a
+
+prop_insertMoveRight_focus' ::
+  Property
+prop_insertMoveRight_focus' =
+  prop_insertMoveRight_focus (Gen.int (Range.linear 0 9999))
+
+prop_indices ::
+  forall a.
+  (Eq a, Show a, Arg a, Vary a) =>
+  Gen a
+  -> Property
+prop_indices genA =
+  property $
+    do  z <- forAll (genListZipper genA)
+        f      <- forAllFn (fn @a Gen.bool)
+        (o, _) <- forAllWith (\(_, s) -> s) (noeditOperation' f)
+        n      <- forAll (Gen.int (Range.linear 1 99))
+        let t = list . zipperIndices <$> replicateM_ n o `execListZipperOp` z
+        traverse_ (=== zip [0..] (list z)) t
+
+prop_indices' ::
+  Property
+prop_indices' =
+  prop_indices (Gen.int (Range.linear 0 9999))

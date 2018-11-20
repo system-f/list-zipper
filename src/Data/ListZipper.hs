@@ -391,14 +391,14 @@ insertMoveLeft ::
   -> ListZipper a
   -> ListZipper a
 insertMoveLeft a (ListZipper l x r) =
-  ListZipper (a:l) x r
+  ListZipper (x:l) a r
 
 insertMoveRight ::
   a
   -> ListZipper a
   -> ListZipper a
 insertMoveRight a (ListZipper l x r) =
-  ListZipper l x (a:r)
+  ListZipper l a (x:r)
 
 ----
 
