@@ -6,12 +6,12 @@ module Main where
 
 import Control.Applicative(pure, (*>))
 import Data.Bool(Bool)
-import Data.Eq(Eq((==)))
-import Data.Foldable(all)
+import Data.Eq(Eq)
+import Data.Foldable(traverse_)
 import Data.Function(($))
 import Data.ListZipper(ListZipper(ListZipper), ListZipperOp', moveLeft, moveRight, moveLeftUntil, moveRightUntil, moveLeftRightUntil, moveRightLeftUntil, moveLeftUntilThen, moveRightUntilThen, moveLeftRightUntilThen, moveRightLeftUntilThen, list, (##>), deleteStepLeft, deleteStepRight, runListZipperOp)
 import Data.String(String)
-import Hedgehog(Gen, Property, property, forAll, forAllWith, assert)
+import Hedgehog(Gen, Property, property, forAll, forAllWith, (===))
 import Hedgehog.Function(Arg, Vary, forAllFn, fn)
 import qualified Hedgehog.Gen as Gen(list, element, bool, int)
 import qualified Hedgehog.Range as Range(linear)
@@ -72,7 +72,7 @@ prop_movementDoesNotEdit genA =
     do  f      <- forAllFn (fn @a Gen.bool)
         (o, _) <- forAllWith (\(_, s) -> s) (noeditOperation' f)
         z      <- forAll (genListZipper genA)
-        assert (all (\z' -> list z == list z') (o ##> z))
+        traverse_ (\z' -> list z === list z') (o ##> z)
 
 prop_movementDoesNotEdit' ::
   Property
@@ -87,7 +87,7 @@ prop_moveRightThenDelete genA =
   property $
     do  z <- forAll (genListZipper genA)
         let t = (moveRight *> deleteStepLeft) `runListZipperOp` z
-        assert (all (\(ListZipper l x r, v) -> ListZipper l x (v:r) == z) t)
+        traverse_ (\(ListZipper l x r, v) -> ListZipper l x (v:r) === z) t
 
 prop_moveRightThenDelete' ::
   Property
@@ -102,7 +102,7 @@ prop_moveLeftThenDelete genA =
   property $
     do  z <- forAll (genListZipper genA)
         let t = (moveLeft *> deleteStepRight) `runListZipperOp` z
-        assert (all (\(ListZipper l x r, v) -> ListZipper (v:l) x r == z) t)
+        traverse_ (\(ListZipper l x r, v) -> ListZipper (v:l) x r === z) t
 
 prop_moveLeftThenDelete' ::
   Property

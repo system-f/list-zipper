@@ -83,6 +83,8 @@ module Data.ListZipper(
 , opWhileJust
 , deleteStepLeft
 , deleteStepRight
+, modifyFocus
+, setFocus
 ) where
 
 import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty), (<*))
@@ -914,6 +916,18 @@ deleteStepRight =
       h:t ->
         Just (ListZipper l h t, x)
   )
+
+modifyFocus ::
+  (a -> a)
+  -> ListZipperOp a a
+modifyFocus f =
+  state (\(ListZipper l x r) -> (x, ListZipper l (f x) r))
+
+setFocus ::
+  a
+  -> ListZipperOp a a
+setFocus =
+  modifyFocus . pure
 
 deriveEq1 ''ListZipper
 deriveShow1 ''ListZipper
