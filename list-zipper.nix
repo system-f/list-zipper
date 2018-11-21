@@ -5,15 +5,15 @@
 }:
 mkDerivation {
   pname = "list-zipper";
-  version = "0.0.5";
+  version = "0.0.6";
   src = ./.;
   libraryHaskellDepends = [
     base comonad deriving-compat lens mtl semigroupoids semigroups
     transformers
   ];
   testHaskellDepends = [
-    base checkers hedgehog hedgehog-fn lens QuickCheck tasty
-    tasty-hedgehog tasty-hunit tasty-quickcheck
+    base checkers hedgehog hedgehog-fn lens mtl QuickCheck tasty
+    tasty-hedgehog tasty-hunit tasty-quickcheck transformers
   ];
   homepage = "https://github.com/qfpl/list-zipper";
   description = "A list zipper";
