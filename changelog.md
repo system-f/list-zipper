@@ -1,3 +1,7 @@
+0.0.7
+
+* haddock for function categories
+
 0.0.6
 
 * tests

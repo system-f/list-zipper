@@ -6,60 +6,37 @@
 {-# LANGUAGE TypeFamilies #-}
 
 module Data.ListZipper(
+-- * data types
   ListZipper(..)
+, ListZipperOp(..)
+, ListZipperOp'
+-- * lenses and prisms
 , AsListZipper(..)
 , HasListZipper(..)
+, HasListZipperOp(..)
+, AsListZipperOp(..)
+-- * traversals
 , leftz'
 , rightz'
 , leftzrightz
 , rightzleftz
+-- * make zippers
 , zipper
 , zipper0L
 , zipper0L'
 , zipper0R
 , zipper0R'
+-- * rezip
 , list
+-- * indices
 , zipperIndices
-, moveStart
-, moveEnd
-, atStart
-, atEnd
-, moveLeftLoop
-, moveRightLoop
-, insertMoveLeft
-, insertMoveRight
-, ListZipperOp(..)
-, ListZipperOp'
-, HasListZipperOp(..)
-, AsListZipperOp(..)
-, liftListZipperOp
-, getFocus
-, getLeft
-, getRight
-, getRightz
-, getLeftz
-, getList
-, mkListZipperOp
-, (*>>)
-, (<<*)
-, mkListZipperOp'
-, (.>>)
-, (<<.)
-, runListZipperOp
-, execListZipperOp
-, (##>)
-, (<##)
-, evalListZipperOp
-, (&&>)
-, (<&&)
-, execOpList
-, (%%>)
-, (<%%)
-, execOpList'
-, ($$>)
-, (<$$)
+-- * movement
 , moveLeft
 , moveRight
+, moveStart
+, moveEnd
+, moveLeftLoop
+, moveRightLoop
 , opWith
 , moveLeftWith
 , moveRightWith
@@ -80,11 +57,47 @@ module Data.ListZipper(
 , moveRightUntilThen
 , moveLeftRightUntilThen
 , moveRightLeftUntilThen
-, opWhileJust
+-- * insertion
+, insertMoveLeft
+, insertMoveRight
+-- * deletion
 , deleteStepLeft
 , deleteStepRight
+-- * modifcation
 , modifyFocus
 , setFocus
+-- * focus position
+, atStart
+, atEnd
+-- * get context
+, getFocus
+, getLeft
+, getRight
+, getRightz
+, getLeftz
+, getList
+-- * list zipper state operations
+, liftListZipperOp
+, mkListZipperOp
+, (*>>)
+, (<<*)
+, mkListZipperOp'
+, (.>>)
+, (<<.)
+, runListZipperOp
+, execListZipperOp
+, (##>)
+, (<##)
+, evalListZipperOp
+, (&&>)
+, (<&&)
+, execOpList
+, (%%>)
+, (<%%)
+, execOpList'
+, ($$>)
+, (<$$)
+, opWhileJust
 ) where
 
 import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty), (<*))
