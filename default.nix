@@ -36,6 +36,7 @@ let
       parsers = pkgs.haskell.lib.dontCheck super.parsers;
       notzero = sources.notzero;
       tagsoup-selection = pkgs.haskell.lib.doJailbreak super.tagsoup-selection;
+      concurrent-output = pkgs.haskell.lib.doJailbreak super.concurrent-output;
       # waargonaut = sources.waargonaut;
     };
   };
