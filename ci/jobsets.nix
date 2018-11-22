@@ -18,7 +18,7 @@
             "keepnr": 5,
             "inputs": {
                 "list-zipper": { "type": "git", "value": "https://github.com/qfpl/list-zipper", "emailresponsible": false },
-                "nixpkgs": { "type": "git", "value": "https://github.com/NixOS/nixpkgs.git release-17.03", "emailresponsible": false }
+                "nixpkgs": { "type": "git", "value": "https://github.com/NixOS/nixpkgs.git release-18.09", "emailresponsible": false }
             }
         }
     }
