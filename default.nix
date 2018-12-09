@@ -12,8 +12,8 @@ let
     papa = pkgs.fetchFromGitHub {
       owner = "qfpl";
       repo = "papa";
-      rev = "536b0a9243802347c299e077b5d85beb80d3a4a1";
-      sha256 = "10wx0z5cd8dajr3rdskaq64v42ppa8dbb3rs3jyj872218xjz6nr";
+      rev = "5e9ebc1ffa2e40894ed884b637285022278f98e9";
+      sha256 = "085bkmbqa34aks2hgfhxkl2vq8x1qrk5n4nzmvp35nqgcc53cksg";
     };
 
     notzero = pkgs.fetchFromGitHub {
@@ -36,6 +36,7 @@ let
       parsers = pkgs.haskell.lib.dontCheck super.parsers;
       notzero = sources.notzero;
       tagsoup-selection = pkgs.haskell.lib.doJailbreak super.tagsoup-selection;
+      concurrent-output = pkgs.haskell.lib.doJailbreak super.concurrent-output;
       # waargonaut = sources.waargonaut;
     };
   };
