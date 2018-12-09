@@ -30,8 +30,6 @@ module Data.ListZipper(
 , list
 -- * indices
 , zipperIndices
--- * transform
-, rev
 -- * movement
 , moveLeft
 , moveRight
@@ -196,7 +194,7 @@ instance Each (ListZipper a) (ListZipper a) a a where
 
 instance Reversing (ListZipper a) where
   reversing (ListZipper l x r) =
-    ListZipper (reverse l) x (reverse r)
+    ListZipper r x l
 
 type instance IxValue (ListZipper a) = a
 type instance Index (ListZipper a) = Int
@@ -363,12 +361,6 @@ zipperIndices (ListZipper l x r) =
         (reverse l')
         (ln, x)
         (zip [ln + 1..] r)
-
-rev ::
-  ListZipper a
-  -> ListZipper a
-rev (ListZipper l x r) =
-  ListZipper r x l
 
 moveStart ::
   ListZipper a

@@ -1,3 +1,7 @@
+0.0.9
+
+* fix reversing
+
 0.0.8
 
 * add `rev` function to reverse
