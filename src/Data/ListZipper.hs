@@ -30,6 +30,8 @@ module Data.ListZipper(
 , list
 -- * indices
 , zipperIndices
+-- * transform
+, rev
 -- * movement
 , moveLeft
 , moveRight
@@ -79,6 +81,7 @@ module Data.ListZipper(
 -- * list zipper state operations
 , liftListZipperOp
 , mkListZipperOp
+, (<$~)
 , (*>>)
 , (<<*)
 , mkListZipperOp'
@@ -118,7 +121,7 @@ import Data.Eq(Eq((==)))
 import Data.Eq.Deriving(deriveEq1)
 import Data.Foldable(Foldable(toList, foldMap))
 import Data.Function(flip)
-import Data.Functor(Functor(fmap), (<$>))
+import Data.Functor(Functor(fmap), (<$>), (<$))
 import Data.Functor.Alt(Alt((<!>)))
 import Data.Functor.Apply(Apply((<.>)))
 import Data.Functor.Bind(Bind((>>-)))
@@ -361,6 +364,12 @@ zipperIndices (ListZipper l x r) =
         (ln, x)
         (zip [ln + 1..] r)
 
+rev ::
+  ListZipper a
+  -> ListZipper a
+rev (ListZipper l x r) =
+  ListZipper r x l
+
 moveStart ::
   ListZipper a
   -> ListZipper a
@@ -592,6 +601,22 @@ mkListZipperOp ::
   -> ListZipperOp a b
 mkListZipperOp f = 
   get >>= liftListZipperOp . f
+
+(<$~) ::
+  ListZipperOp a b
+  -> ListZipperOp a c
+  -> ListZipperOp a b
+ListZipperOp x <$~ ListZipperOp y =
+  ListZipperOp
+    (\z ->
+      case x z of
+        Nothing ->
+          Nothing
+        Just (z', r) ->
+          fmap (r <$) (y z')
+    )
+
+infixl 5 <$~
 
 (*>>) :: 
   (ListZipper a -> Maybe b)
