@@ -31,7 +31,7 @@ library
                     , lens >= 4 && < 5
                     , comonad >= 5.0 && < 6.0
                     , semigroupoids >=5.1 && <5.4
-                    , semigroups >=0.16 && <0.19
+                    , semigroups >=0.16 && <0.20
                     , mtl >=2.2 && <2.3
                     , transformers >=0.4.1 && <5.5
 
