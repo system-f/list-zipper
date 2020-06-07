@@ -1,3 +1,7 @@
+0.0.10
+
+* Relax bounds on semigroups
+
 0.0.9
 
 * fix reversing
