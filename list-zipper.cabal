@@ -1,14 +1,15 @@
 name:               list-zipper
-version:            0.0.10
+version:            0.0.11
 license:            BSD3
 license-file:       LICENCE
-author:             Queensland Functional Programming Lab <oᴉ˙ldɟb@llǝʞsɐɥ>
-maintainer:         Queensland Functional Programming Lab <oᴉ˙ldɟb@llǝʞsɐɥ>
-copyright:          Copyright (c) 2018, Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230.
+author:             Tony Morris <ʇǝu˙sıɹɹoɯʇ@ןןǝʞsɐɥ>
+maintainer:         Tony Morris <ʇǝu˙sıɹɹoɯʇ@ןןǝʞsɐɥ>
+copyright:          Copyright (c) 2018-2019, Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230.
+                    Copyright (c) 2020-2021 Tony Morris
 synopsis:           A list zipper
 category:           Data
-description:       
-  <<https://raw.githubusercontent.com/qfpl/assets/master/data61-transparent-bg.png>>
+description:
+  <<https://system-f.gitlab.io/logo/systemf-450x450.jpg>>
   .
   A list zipper.
 homepage:           https://github.com/qfpl/list-zipper
@@ -30,6 +31,8 @@ library
                     , deriving-compat >= 0.5 && < 0.6
                     , lens >= 4 && < 5
                     , comonad >= 5.0 && < 6.0
+                    , MonadRandom >= 0.5 && < 1
+                    , random-shuffle >= 0.0.4 && < 1
                     , semigroupoids >=5.1 && <5.4
                     , semigroups >=0.16 && <0.20
                     , mtl >=2.2 && <2.3
@@ -39,7 +42,7 @@ library
                     -Wall
 
   default-extensions:
-  
+
                     NoImplicitPrelude
 
   hs-source-dirs:
@@ -64,17 +67,17 @@ test-suite          tests
                     , transformers >=0.4.1 && <5.5
                     , mtl >=2.2 && <2.3
 
-  type:             
+  type:
                     exitcode-stdio-1.0
 
-  main-is:          
+  main-is:
                     Tests.hs
 
-  hs-source-dirs:   
+  hs-source-dirs:
                     test
 
-  default-language: 
+  default-language:
                     Haskell2010
 
-  ghc-options:       
+  ghc-options:
                     -Wall

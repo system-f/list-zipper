@@ -1,3 +1,7 @@
+0.0.11
+
+* Implement shuffling
+
 0.0.10
 
 * Relax bounds on semigroups

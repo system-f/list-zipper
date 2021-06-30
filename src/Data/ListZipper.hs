@@ -87,6 +87,7 @@ module Data.ListZipper(
 , (<<.)
 , runListZipperOp
 , execListZipperOp
+, execListZipperOpOr
 , (##>)
 , (<##)
 , evalListZipperOp
@@ -99,18 +100,28 @@ module Data.ListZipper(
 , ($$>)
 , (<$$)
 , opWhileJust
+-- * list zipper state operations
+, shuffleLeft
+, shuffleRight
+, shuffleListZipper
 ) where
+
+import System.Random.Shuffle
+import Control.Monad.Random.Class
+
 
 import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty), (<*))
 import Control.Category((.), id)
 import Control.Comonad(Comonad(duplicate, extract))
 import Control.Lens(Each(each), Reversing(reversing), Ixed(ix), Rewrapped, Wrapped(Unwrapped, _Wrapped'), IxValue, Index, Prism', Lens', Traversal', _Wrapped, (^.), iso, (&), _1, _2)
+import Control.Monad
 import Control.Monad.Error.Class(MonadError(throwError, catchError))
 import Control.Monad.Fail(MonadFail(fail))
 import Control.Monad.Fix(MonadFix(mfix))
 import Control.Monad.Reader(MonadReader(ask, local, reader))
 import Control.Monad.State(MonadState(get, put, state))
 import qualified Control.Monad.Fail as Fail(fail)
+import Data.Foldable
 import Data.Traversable(Traversable(traverse))
 import Data.Semigroup.Traversable(Traversable1(traverse1))
 import Control.Monad(Monad((>>=), return), MonadPlus(mplus, mzero), (=<<))
@@ -132,11 +143,11 @@ import Data.Monoid(Monoid(mappend, mempty))
 import Data.Ord(Ord((<)))
 import Data.Semigroup(Semigroup((<>)))
 import Data.Semigroup.Foldable(Foldable1(foldMap1))
-import Prelude(Show, (+))
+import Prelude(Show, (+), (-))
 import Text.Show.Deriving(deriveShow1)
 
 data ListZipper a =
-  ListZipper 
+  ListZipper
     [a]
     a
     [a]
@@ -231,7 +242,7 @@ instance Comonad ListZipper where
 class AsListZipper z a | z -> a where
   _ListZipper ::
     Prism' z (ListZipper a)
-  
+
 instance AsListZipper (ListZipper a) a where
   _ListZipper =
     id
@@ -467,7 +478,7 @@ instance Applicative (ListZipperOp a) where
 
 instance Bind (ListZipperOp a) where
   ListZipperOp j >>- f =
-    ListZipperOp (\z -> 
+    ListZipperOp (\z ->
       j z >>- \(z', a) ->
       z' & f a ^. _Wrapped
       )
@@ -588,10 +599,10 @@ getList ::
 getList =
   reader list
 
-mkListZipperOp :: 
+mkListZipperOp ::
   (ListZipper a -> Maybe b)
   -> ListZipperOp a b
-mkListZipperOp f = 
+mkListZipperOp f =
   get >>= liftListZipperOp . f
 
 (<$~) ::
@@ -610,7 +621,7 @@ ListZipperOp x <$~ ListZipperOp y =
 
 infixl 5 <$~
 
-(*>>) :: 
+(*>>) ::
   (ListZipper a -> Maybe b)
   -> ListZipperOp a c
   -> ListZipperOp a b
@@ -619,7 +630,7 @@ f *>> k =
 
 infixl 5 *>>
 
-(<<*) :: 
+(<<*) ::
   ListZipperOp a c
   -> (ListZipper a -> Maybe b)
   -> ListZipperOp a b
@@ -631,7 +642,7 @@ infixl 5 <<*
 mkListZipperOp' ::
   (ListZipper a -> Maybe (ListZipper a))
   -> ListZipperOp' a
-mkListZipperOp' f = 
+mkListZipperOp' f =
   ListZipperOp (\s -> (\s' -> (s', ())) <$> f s)
 
 (.>>) ::
@@ -665,6 +676,13 @@ execListZipperOp ::
   -> Maybe (ListZipper a)
 execListZipperOp o =
   fmap (^. _1) . runListZipperOp o
+
+execListZipperOpOr ::
+  ListZipperOp a x
+  -> ListZipper a
+  -> ListZipper a
+execListZipperOpOr o =
+  fromMaybe <*> execListZipperOp o
 
 (##>) ::
   ListZipperOp a x
@@ -958,6 +976,39 @@ setFocus ::
   -> ListZipperOp a a
 setFocus =
   modifyFocus . pure
+
+shuffleLeft ::
+  ListZipperOp' a
+shuffleLeft =
+  mkListZipperOp' (\z ->
+    case z of
+      ListZipper [] _ _ ->
+        Nothing
+      ListZipper (h:t) x r ->
+        Just (ListZipper t x (h:r))
+    )
+
+shuffleRight ::
+  ListZipperOp' a
+shuffleRight =
+  mkListZipperOp' (\z ->
+    case z of
+      ListZipper _ _ [] ->
+        Nothing
+      ListZipper l x (h:t) ->
+        Just (ListZipper (h:l) x t)
+  )
+
+shuffleListZipper ::
+  MonadRandom f =>
+  ListZipper a
+  -> f (ListZipper a)
+shuffleListZipper z =
+  let z' =
+        opWhileJust shuffleLeft z
+  in  do  i <- getRandomR (0, length z - 1)
+          z'' <- rightz shuffleM z'
+          pure (execListZipperOpOr (replicateM i shuffleRight) z'')
 
 deriveEq1 ''ListZipper
 deriveShow1 ''ListZipper
