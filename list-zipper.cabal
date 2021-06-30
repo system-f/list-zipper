@@ -12,15 +12,15 @@ description:
   <<https://system-f.gitlab.io/logo/systemf-450x450.jpg>>
   .
   A list zipper.
-homepage:           https://github.com/qfpl/list-zipper
-bug-reports:        https://github.com/qfpl/list-zipper/issues
+homepage:           https://github.com/system-f/list-zipper
+bug-reports:        https://github.com/system-f/list-zipper/issues
 cabal-version:      >= 1.10
 build-type:         Simple
 extra-source-files: changelog.md
 
 source-repository   head
   type:             git
-  location:         git@github.com:qfpl/list-zipper.git
+  location:         git@github.com:system-f/list-zipper.git
 
 library
   default-language:
