@@ -1,9 +1,9 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 module Data.ListZipper(
 -- * data types
@@ -108,27 +108,22 @@ module Data.ListZipper(
 
 import System.Random.Shuffle
 import Control.Monad.Random.Class
-
-
 import Control.Applicative(Applicative(pure, (<*>)), Alternative((<|>), empty), (<*))
 import Control.Category((.), id)
 import Control.Comonad(Comonad(duplicate, extract))
 import Control.Lens(Each(each), Reversing(reversing), Ixed(ix), Rewrapped, Wrapped(Unwrapped, _Wrapped'), IxValue, Index, Prism', Lens', Traversal', _Wrapped, (^.), iso, (&), _1, _2)
-import Control.Monad
 import Control.Monad.Error.Class(MonadError(throwError, catchError))
 import Control.Monad.Fail(MonadFail(fail))
 import Control.Monad.Fix(MonadFix(mfix))
 import Control.Monad.Reader(MonadReader(ask, local, reader))
 import Control.Monad.State(MonadState(get, put, state))
-import qualified Control.Monad.Fail as Fail(fail)
-import Data.Foldable
 import Data.Traversable(Traversable(traverse))
 import Data.Semigroup.Traversable(Traversable1(traverse1))
-import Control.Monad(Monad((>>=), return), MonadPlus(mplus, mzero), (=<<))
+import Control.Monad(Monad((>>=), return), MonadPlus(mplus, mzero), (=<<), replicateM)
 import Data.Bool(Bool)
 import Data.Eq(Eq((==)))
 import Data.Eq.Deriving(deriveEq1)
-import Data.Foldable(Foldable(toList, foldMap))
+import Data.Foldable(Foldable(toList, foldMap, length))
 import Data.Function(flip)
 import Data.Functor(Functor(fmap), (<$>), (<$))
 import Data.Functor.Alt(Alt((<!>)))
@@ -540,7 +535,7 @@ instance MonadFix (ListZipperOp a) where
 instance MonadFail (ListZipperOp a) where
   fail s =
     ListZipperOp (\_ ->
-      Fail.fail s
+      fail s
     )
 
 instance MonadError () (ListZipperOp a) where

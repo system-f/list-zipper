@@ -5,7 +5,7 @@ license-file:       LICENCE
 author:             Tony Morris <ʇǝu˙sıɹɹoɯʇ@ןןǝʞsɐɥ>
 maintainer:         Tony Morris <ʇǝu˙sıɹɹoɯʇ@ןןǝʞsɐɥ>
 copyright:          Copyright (c) 2018-2019, Commonwealth Scientific and Industrial Research Organisation (CSIRO) ABN 41 687 119 230.
-                    Copyright (c) 2020-2021 Tony Morris
+                    Copyright (c) 2020-2024 Tony Morris
 synopsis:           A list zipper
 category:           Data
 description:
@@ -33,10 +33,10 @@ library
                     , comonad >= 5.0 && < 6.0
                     , MonadRandom >= 0.5 && < 1
                     , random-shuffle >= 0.0.4 && < 1
-                    , semigroupoids >=5.1 && <5.4
-                    , semigroups >=0.16 && < 0.21
-                    , mtl >=2.2 && <2.3
-                    , transformers >=0.4.1 && <5.5
+                    , semigroupoids >= 5.1 && < 7
+                    , semigroups >= 0.16 && < 1
+                    , mtl >= 2.2 && < 2.3
+                    , transformers >= 0.4.1 && < 5.5
 
   ghc-options:
                     -Wall
@@ -57,15 +57,15 @@ test-suite          tests
                     , base >= 4.8 && < 5
                     , checkers >= 0.4.6 && < 0.5
                     , list-zipper
-                    , lens >= 4 && < 4.19
+                    , lens >= 4 && < 5.3
                     , tasty >= 0.11 && < 1.2
                     , tasty-hunit >= 0.9 && < 0.11
                     , tasty-quickcheck >= 0.8.4 && < 0.11
                     , hedgehog >= 0.6 && < 1.1
                     , hedgehog-fn >= 0.6 && < 1.1
                     , tasty-hedgehog >= 0.2 && < 1.1
-                    , transformers >=0.4.1 && <5.5
-                    , mtl >=2.2 && <2.3
+                    , transformers >= 0.4.1 && < 5.5
+                    , mtl >= 2.2 && <2.3
 
   type:
                     exitcode-stdio-1.0
