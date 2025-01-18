@@ -1,3 +1,8 @@
+0.0.12
+
+* Widen dependency bounds
+* Use fewer imports
+
 0.0.11
 
 * Implement shuffling
